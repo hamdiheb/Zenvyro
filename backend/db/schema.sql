@@ -34,6 +34,19 @@ CREATE TABLE users (
 );
 CREATE INDEX users_business_id_idx ON users (business_id);
 
+-- One row per login session. The HttpOnly cookie holds a random session token;
+-- only its SHA-256 hash (token_hash) is stored. Logout deletes the row.
+CREATE TABLE sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash text NOT NULL UNIQUE CHECK (token_hash ~ '^[0-9a-f]{64}$'),  -- SHA-256 of the cookie's session token, hex
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL DEFAULT (now() + interval '3 days'),
+  CHECK (expires_at > created_at)
+);
+CREATE INDEX sessions_user_id_idx ON sessions (user_id);
+CREATE INDEX sessions_expires_at_idx ON sessions (expires_at);
+
 CREATE TABLE customers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,

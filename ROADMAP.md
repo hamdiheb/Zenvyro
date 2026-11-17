@@ -112,7 +112,10 @@ Scope rule: if a task slips, cut from the **Deferred list** first, never from th
 ### Week 1 – Foundation and human chat (no AI) · Days 1–5
 1. `chore: scaffold backend and frontend (Express, React + Vite, eslint naming rules, jest config, .gitignore and .env.example)` — Day 1
 2. `feat(db): docker-compose Postgres, connection pool, full schema.sql, migration and seed runner` — Day 1–2
-3. `feat(auth): register business and owner, login, JWT, role middleware, tenant scoping` — Day 2
+3. `feat(auth): register business and owner, login, opaque session token in a 3-day HttpOnly cookie, SHA-256 hashed session stored in the sessions table, logout deletes the session, role middleware, tenant scoping` — Day 2
+   - Every register and login creates a row in `sessions` and sets a random session token in an HttpOnly cookie with a 3-day expiry. No JWT is used.
+   - The database stores only `token_hash`, the SHA-256 hash of the session token. The raw token never touches the database.
+   - Each request hashes the cookie value, then looks up a session row whose hash matches and whose `expires_at` is in the future. Logout deletes that row and clears the cookie.
 4. `feat(conversations): conversation and message REST API (create, list, paginate, filter)` — Day 3
 5. `feat(realtime): Socket.IO gateway with a room per conversation` — Day 3
 6. `feat(widget): embeddable customer chat widget with widget-key auth, per 2.jpeg` — Day 4
@@ -180,7 +183,7 @@ Code must read like plain English so anyone can understand it without comments.
 
 ## 5d. Secrets and Environment Rules (mandatory)
 
-1. Secrets never go in git: the OpenRouter API key, database password, JWT secret, and any geo-IP key.
+1. Secrets never go in git: the OpenRouter API key, database password, and any geo-IP key.
 2. They live in `.env` files (root for docker-compose, plus `backend/.env` and `frontend/.env` if needed). Code reads them only through `process.env`, via a single config module in `backend/src/config`.
 3. **`.gitignore` is created before the first commit.** It lists `.env`, `.env.*` (with `!.env.example`), `node_modules/`, and build output. Run `git status` before every commit to confirm no `.env` is staged.
 4. A committed `.env.example` documents every variable with placeholder values only, never real keys.
@@ -246,7 +249,7 @@ Isolate it behind an `ecommerceProvider` interface so a real Shopify/WooCommerce
 
 1. **Realtime transport:** **Socket.IO** vs raw `ws` (Socket.IO is easier for rooms and reconnects).
 2. **Language:** **JavaScript** (matches Plan.md) vs TypeScript.
-3. **Auth:** **JWT for staff**, widget-key + anonymous session token for customers.
+3. **Auth:** **opaque session token for staff** in a 3-day HttpOnly cookie, stored as a SHA-256 hash in the `sessions` table (logout deletes the row). No JWT. Widget-key + anonymous session token for customers.
 4. **Rules format:** **plain-language rules the LLM evaluates** (as in the Plan.md example) vs structured/regex rules. Hybrid later.
 5. **Frontend styling:** **plain CSS modules with design tokens** matching the images vs Tailwind.
 6. **Languages:** **English only for MVP**; multilingual later.

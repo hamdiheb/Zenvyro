@@ -112,10 +112,12 @@ Scope rule: if a task slips, cut from the **Deferred list** first, never from th
 ### Week 1 – Foundation and human chat (no AI) · Days 1–5
 1. `chore: scaffold backend and frontend (Express, React + Vite, eslint naming rules, jest config, .gitignore and .env.example)` — Day 1
 2. `feat(db): docker-compose Postgres, connection pool, full schema.sql, migration and seed runner` — Day 1–2
-3. `feat(auth): register business and owner, login, opaque session token in a 3-day HttpOnly cookie, SHA-256 hashed session stored in the sessions table, logout deletes the session, role middleware, tenant scoping` — Day 2
-   - Every register and login creates a row in `sessions` and sets a random session token in an HttpOnly cookie with a 3-day expiry. No JWT is used.
+3. `feat(auth): authentication route with sign-up (business + owner), sign-in, me and sign-out; opaque session token in a 3-day HttpOnly cookie, SHA-256 hashed session stored in the sessions table, role middleware, tenant scoping` — Day 2
+   - Routes live under one `/api/authentication` route: `POST /sign-up`, `POST /sign-in`, `GET /me`, `POST /sign-out`. Each endpoint has its own validation or session middleware and its own controller.
+   - Sign-up registers a business and its owner in one transaction. Admins and agents are added later from the business dashboard.
+   - Every sign-up and sign-in creates a row in `sessions` and sets a random session token in an HttpOnly cookie with a 3-day expiry. No JWT is used.
    - The database stores only `token_hash`, the SHA-256 hash of the session token. The raw token never touches the database.
-   - Each request hashes the cookie value, then looks up a session row whose hash matches and whose `expires_at` is in the future. Logout deletes that row and clears the cookie.
+   - `me` and `sign-out` hash the cookie value and look up a session row whose hash matches and whose `expires_at` is in the future. Sign-out deletes that row and clears the cookie.
 4. `feat(conversations): conversation and message REST API (create, list, paginate, filter)` — Day 3
 5. `feat(realtime): Socket.IO gateway with a room per conversation` — Day 3
 6. `feat(widget): embeddable customer chat widget with widget-key auth, per 2.jpeg` — Day 4

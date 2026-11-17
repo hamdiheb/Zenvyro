@@ -1,4 +1,4 @@
-import 'dotenv/config'
+import '../../src/config/loadProjectEnvironmentFile.js'
 
 // Runs before every test file. Points the app at the real saad_test database
 // before environmentConfig.js reads process.env.

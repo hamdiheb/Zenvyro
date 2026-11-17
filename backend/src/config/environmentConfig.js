@@ -1,4 +1,4 @@
-import 'dotenv/config'
+import './loadProjectEnvironmentFile.js'
 
 const databaseUrl = process.env.DATABASE_URL
 

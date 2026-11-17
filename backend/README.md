@@ -4,9 +4,15 @@ Express 5 API for the support platform. Raw SQL on PostgreSQL through `pg`, no O
 
 ## Setup
 
-1. Copy `../.env.example` to `../.env` and fill in real values. Never commit `.env`.
-2. Start Postgres: `docker compose up -d postgres` (from `saas/`).
-3. Run tests: `npm test`. Tests run against `TEST_DATABASE_URL` (the `saad_test` database).
+1. Copy `../.env.example` to `../.env` (the `saas/` folder) and fill in real values. Never commit `.env`.
+2. Start Postgres from `saas/`: `docker compose up -d postgres`. Wait until `docker compose ps` shows the container as `healthy`.
+   - The compose file publishes port 5432 to the host. Stop any local PostgreSQL that already uses that port first.
+   - The `saad_test` database is created only when the data volume is first created. If it is missing, run `docker compose down -v` and then `docker compose up -d postgres` again. That deletes the volume's data.
+3. Run tests from `backend/`: `npm test`. Tests run against `TEST_DATABASE_URL` (the `saad_test` database). The test setup applies `db/schema.sql` itself if the tables are missing.
+
+`src/config/loadProjectEnvironmentFile.js` loads `saas/.env` whatever folder the command runs from. Values already set in the environment (for example by docker compose) take priority over the file.
+
+The full `docker compose up` (backend + postgres) is not usable yet: the backend command runs `src/db/databaseCommands.js`, which is the Week 1 item 2 migration runner and not written yet.
 
 ## Authentication
 
@@ -30,7 +36,8 @@ Errors are JSON: `{ "error": "message" }`. Expected failures return 400 (validat
 
 ### Layout
 
-- `middleware/validateSignUpMiddleware.js`, `validateSignInMiddleware.js`: zod checks on the request body.
+- `middleware/validateSignUpMiddleware.js`, `validateSignInMiddleware.js`: plain checks on the request body (no validation library), using helpers in `utils/inputValidation.js`. Each check returns a 400 with a readable message.
+- `middleware/errorHandlerMiddleware.js`: turns expected errors into JSON. Unexpected errors become a generic 500, so SQL and stack details are never sent to the client.
 - `middleware/requireSessionMiddleware.js`: session check for protected routes. Sets `request.authenticatedUser`.
 - `controllers/authenticationController.js`: HTTP handling and cookie setting.
 - `services/authenticationService.js`: sign-up, sign-in and sign-out rules.

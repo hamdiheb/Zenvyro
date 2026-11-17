@@ -1,16 +1,24 @@
-import { z } from 'zod'
 import { ApplicationError } from '../utils/applicationError.js'
+import { readBodyText, isValidEmail } from '../utils/inputValidation.js'
 
-const signInBodySchema = z.object({
-  email: z.string().trim().toLowerCase().email('A valid email is required.').max(254),
-  password: z.string().min(1, 'Password is required.').max(72),
-})
+const PASSWORD_MAXIMUM_LENGTH = 72
 
 export function validateSignInMiddleware(request, _response, nextFunction) {
-  const parseResult = signInBodySchema.safeParse(request.body)
-  if (!parseResult.success) {
-    return nextFunction(new ApplicationError(400, parseResult.error.issues[0].message))
+  const signInFields = {
+    email: readBodyText(request.body, 'email').trim().toLowerCase(),
+    password: readBodyText(request.body, 'password'),
   }
-  request.validatedBody = parseResult.data
+
+  if (!isValidEmail(signInFields.email)) {
+    return nextFunction(new ApplicationError(400, 'A valid email is required.'))
+  }
+  if (signInFields.password.length === 0) {
+    return nextFunction(new ApplicationError(400, 'Password is required.'))
+  }
+  if (signInFields.password.length > PASSWORD_MAXIMUM_LENGTH) {
+    return nextFunction(new ApplicationError(400, 'Password must be at most 72 characters.'))
+  }
+
+  request.validatedBody = signInFields
   return nextFunction()
 }

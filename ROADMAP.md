@@ -78,7 +78,7 @@ Dashboard ──────REST─────►     │
 | `agentDraftVerifier` (`verifyAgentDraft`) | agent draft | `{grammar, policy, tone, issues[], suggestion}` (strict JSON) |
 | `escalationDecider` (`decideWhetherToEscalate`) | confidence, intent, sentiment, rule hits | `answer \| escalate` |
 
-Reliability notes for free OpenRouter models: force **JSON-schema outputs** and validate them (e.g. with `zod`). Keep a **fallback model chain** with retry and backoff for rate limits. Put all prompts in versioned files. Give every AI call a deterministic **mock provider** so Jest tests never hit the network.
+Reliability notes for free OpenRouter models: force **JSON-schema outputs** and validate them with plain checks in code. Keep a **fallback model chain** with retry and backoff for rate limits. Put all prompts in versioned files. Give every AI call a deterministic **mock provider** so Jest tests never hit the network.
 
 ---
 

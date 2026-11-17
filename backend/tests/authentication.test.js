@@ -201,7 +201,8 @@ describe('GET /api/authentication/me', () => {
   it('returns 401 when the session has expired, even though the row still exists', async () => {
     const signUpResponse = await signUpAcmeOwner()
     const sessionToken = extractSessionToken(signUpResponse)
-    await pool.query(`UPDATE sessions SET expires_at = now() - interval '1 second'`)
+    // The schema requires expires_at > created_at, so the session is moved back in time as a whole.
+    await pool.query(`UPDATE sessions SET created_at = now() - interval '2 days', expires_at = now() - interval '1 second'`)
 
     const response = await request(app)
       .get('/api/authentication/me')

@@ -7,7 +7,7 @@ import { PreChatForm } from '../PreChatForm'
 import styles from './ChatWindow.module.css'
 
 // 370×560 on desktop, full screen on phones. The body depends on the chat phase.
-export function ChatWindow({ businessName, chat, onMinimize }) {
+export function ChatWindow({ businessName, chat, onMinimize, isFullScreen = false }) {
   const renderBody = () => {
     if (chat.phase === 'invalid-key') {
       return (
@@ -52,7 +52,7 @@ export function ChatWindow({ businessName, chat, onMinimize }) {
   }
 
   return (
-    <section className={styles.chatWindow} aria-label={`Chat with ${businessName}`}>
+    <section className={`${styles.chatWindow} ${isFullScreen ? styles.fullScreen : ''}`} aria-label={`Chat with ${businessName}`}>
       <ChatWindowHeader businessName={businessName} onMinimize={onMinimize} />
       {renderBody()}
       <p className={styles.poweredBy}>

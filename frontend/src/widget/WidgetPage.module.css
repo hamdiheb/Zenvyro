@@ -21,12 +21,10 @@
 }
 
 /* On phones the open window fills the screen and its header's minimize button closes it. */
-@media (max-width: 480px) {
-  .windowSlot {
-    inset: 0;
-  }
+.compact .windowSlot {
+  inset: 0;
+}
 
-  .isOpen .launcherSlot {
-    display: none;
-  }
+.compact.isOpen .launcherSlot {
+  display: none;
 }

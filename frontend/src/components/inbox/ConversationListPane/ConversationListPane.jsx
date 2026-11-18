@@ -48,7 +48,12 @@ export function ConversationListPane({
       return conversations
     }
     return conversations.filter((conversation) =>
-      [conversation.customerName, conversation.customerEmail, conversation.origin?.countryName]
+      [
+        conversation.customerName,
+        conversation.customerEmail,
+        conversation.origin?.countryName,
+        conversation.lastMessage?.preview,
+      ]
         .filter(Boolean)
         .some((searchableText) => searchableText.toLowerCase().includes(normalizedSearch)),
     )
@@ -74,7 +79,7 @@ export function ConversationListPane({
         </div>
         <TextInput
           aria-label="Search conversations"
-          placeholder="Search by name, email or country"
+          placeholder="Search name, email, country or message"
           leadingIcon={<Search size={16} />}
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}

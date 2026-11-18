@@ -5,6 +5,7 @@ import { SignInPage } from './auth/SignInPage.jsx'
 import { SignUpPage } from './auth/SignUpPage.jsx'
 import { OverviewPage } from './dashboard/OverviewPage.jsx'
 import { AgentInboxPage } from './agent/AgentInboxPage.jsx'
+import { WidgetPage } from './widget/WidgetPage.jsx'
 
 // Placeholder for routes whose page lands in a later commit.
 function RoutePlaceholder({ title }) {
@@ -52,7 +53,7 @@ export function App() {
         />
         <Route path="*" element={<Navigate to="/agent" replace />} />
       </Route>
-      <Route path="/widget" element={<RoutePlaceholder title="Chat widget" />} />
+      <Route path="/widget" element={<WidgetPage />} />
       <Route path="/demo-store" element={<RoutePlaceholder title="Demo store" />} />
     </Routes>
   )

@@ -1,0 +1,49 @@
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.textArea {
+  flex: 1;
+  min-height: 36px;
+  padding: 7px 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+  resize: none;
+}
+
+.textArea:focus-visible {
+  box-shadow: none;
+}
+
+.textArea::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.sendButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  transition: background var(--transition-fast), opacity var(--transition-fast);
+}
+
+.sendButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.sendButton:disabled {
+  opacity: 0.4;
+}

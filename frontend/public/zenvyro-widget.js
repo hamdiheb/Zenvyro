@@ -1,6 +1,7 @@
 // Zenvyro chat widget loader. Paste on any website:
 //   <script src="https://YOUR-ZENVYRO-ORIGIN/zenvyro-widget.js" data-widget-key="wk_…"
 //           data-business-name="Your shop" async></script>
+// data-business-name is optional: it is shown until the chat session returns the business's name.
 // It adds one fixed iframe at the bottom-right. The chat runs inside the iframe, so the host
 // site's CSS cannot change it. The iframe tells this script when it opens or closes, and the
 // script resizes the iframe to fit. No other build is needed.

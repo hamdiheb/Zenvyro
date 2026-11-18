@@ -16,17 +16,19 @@ function isOwnViewportCompact() {
   return window.innerWidth <= COMPACT_LAYOUT_MAXIMUM_WIDTH
 }
 
-// The page inside the widget iframe: /widget?key=wk_…&name=Business. The iframe keeps the host
+// The page inside the widget iframe: /widget?key=wk_…&name=Business. The name from the embed code is
+// only a fallback until the widget session returns the business's own name. The iframe keeps the host
 // site's CSS out. The open state is sent to the parent page, which sizes the iframe to fit.
 // The iframe is always narrow, so when embedded the host page decides the phone layout.
 export function WidgetPage() {
   const [searchParameters] = useSearchParams()
   const widgetKey = searchParameters.get('key') || ''
-  const businessName = searchParameters.get('name') || 'Support'
+  const embedBusinessName = searchParameters.get('name') || ''
   const [isOpen, setIsOpen] = useState(searchParameters.get('open') === '1')
   const [hasUnread, setHasUnread] = useState(false)
   const [isCompactLayout, setIsCompactLayout] = useState(() => !isEmbedded && isOwnViewportCompact())
   const chat = useWidgetChat(widgetKey)
+  const businessName = chat.sessionBusinessName || embedBusinessName || 'Support'
   const newestMessage = chat.messages[chat.messages.length - 1]
 
   // The iframe must be see-through around the launcher and the window.

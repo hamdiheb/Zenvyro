@@ -40,6 +40,7 @@ export function useWidgetChat(widgetKey) {
   const [sessionToken, setSessionToken] = useState(() => (isWidgetKeyValid ? readStoredSessionToken(widgetKey) : null))
   const [loadedToken, setLoadedToken] = useState(null)
   const [messages, setMessages] = useState([])
+  const [sessionBusinessName, setSessionBusinessName] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [isStarting, setIsStarting] = useState(false)
 
@@ -64,6 +65,7 @@ export function useWidgetChat(widgetKey) {
       .then((sessionResponse) => {
         if (!isCancelled) {
           setMessages(sessionResponse.messages)
+          setSessionBusinessName(sessionResponse.business?.name || '')
           setLoadedToken(sessionToken)
         }
       })
@@ -102,6 +104,7 @@ export function useWidgetChat(widgetKey) {
       try {
         const startResponse = await startWidgetSession({ widgetKey, name, email })
         storeSessionToken(widgetKey, startResponse.sessionToken)
+        setSessionBusinessName(startResponse.business?.name || '')
         setSessionToken(startResponse.sessionToken)
         return true
       } catch (error) {
@@ -142,5 +145,6 @@ export function useWidgetChat(widgetKey) {
     phase = 'ready'
   }
 
-  return { phase, messages, errorMessage, isStarting, startChat, sendMessage }
+  // The business name from the API, once a session exists. Before that the page uses the embed's name.
+  return { phase, messages, sessionBusinessName, errorMessage, isStarting, startChat, sendMessage }
 }

@@ -2,32 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { disconnectStaffSocket } from './useRealtimeSocket.js'
 import { fetchCurrentUser, signInStaffUser, signOutStaffUser, signUpBusinessOwner } from '../api/authenticationApi.js'
 
-// GET /me does not return the business name yet, so the name from sign-up is remembered on this device.
-const BUSINESS_NAME_STORAGE_KEY = 'zenvyro.businessName'
-
 const SessionContext = createContext(null)
 
-function readStoredBusinessName() {
-  try {
-    return localStorage.getItem(BUSINESS_NAME_STORAGE_KEY) || ''
-  } catch {
-    return ''
-  }
-}
-
-function storeBusinessName(businessName) {
-  try {
-    localStorage.setItem(BUSINESS_NAME_STORAGE_KEY, businessName)
-  } catch {
-    // Storage can be blocked (private mode). The sidebar then shows a generic workspace name.
-  }
-}
-
-// Loads the signed-in staff user once (GET /me) and shares it with every staff page.
+// Loads the signed-in staff user and their business once (GET /me) and shares them with every staff page.
+// Sign-up, sign-in and /me all return { user, business }.
 export function SessionProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null)
   const [isSessionLoading, setIsSessionLoading] = useState(true)
-  const [businessName, setBusinessName] = useState(readStoredBusinessName)
+  const [currentBusiness, setCurrentBusiness] = useState(null)
 
   useEffect(() => {
     let isCancelled = false
@@ -35,6 +17,7 @@ export function SessionProvider({ children }) {
       .then((sessionResponse) => {
         if (!isCancelled) {
           setCurrentUser(sessionResponse.user)
+          setCurrentBusiness(sessionResponse.business)
         }
       })
       .catch(() => {
@@ -55,14 +38,14 @@ export function SessionProvider({ children }) {
   const signIn = useCallback(async (credentials) => {
     const signInResponse = await signInStaffUser(credentials)
     setCurrentUser(signInResponse.user)
+    setCurrentBusiness(signInResponse.business)
     return signInResponse.user
   }, [])
 
   const signUp = useCallback(async (signUpFields) => {
     const signUpResponse = await signUpBusinessOwner(signUpFields)
     setCurrentUser(signUpResponse.user)
-    setBusinessName(signUpResponse.business?.name || signUpFields.businessName)
-    storeBusinessName(signUpResponse.business?.name || signUpFields.businessName)
+    setCurrentBusiness(signUpResponse.business)
     return signUpResponse.user
   }, [])
 
@@ -72,9 +55,11 @@ export function SessionProvider({ children }) {
     } finally {
       disconnectStaffSocket()
       setCurrentUser(null)
+      setCurrentBusiness(null)
     }
   }, [])
 
+  const businessName = currentBusiness?.name || ''
   const sessionValue = useMemo(
     () => ({ currentUser, isSessionLoading, businessName, signIn, signUp, signOut }),
     [currentUser, isSessionLoading, businessName, signIn, signUp, signOut],

@@ -30,3 +30,15 @@ export async function findUserInBusiness(databaseExecutor, { businessId, userId 
   )
   return result.rows[0] ?? null
 }
+
+// Lists every staff member of a business, by name. Never selects password_hash.
+export async function findUsersForBusiness(databaseExecutor, { businessId }) {
+  const result = await databaseExecutor.query(
+    `SELECT id, name, email, role
+     FROM users
+     WHERE business_id = $1
+     ORDER BY name, id`,
+    [businessId],
+  )
+  return result.rows
+}

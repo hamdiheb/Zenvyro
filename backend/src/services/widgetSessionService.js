@@ -61,6 +61,7 @@ export async function startWidgetSessionForWidgetKey({ widgetKey, visitorName, v
 
     await client.query('COMMIT')
     return {
+      businessId: businessRow.id,
       sessionToken,
       customer: { id: customerRow.id, name: customerRow.name },
       conversation: { id: conversationRow.id },

@@ -316,3 +316,162 @@ describe('website visitor sockets', () => {
     staffSocketClient.close()
   })
 })
+
+const CONVERSATION_CREATED_EVENT = 'conversation:created'
+const CONVERSATION_UPDATED_EVENT = 'conversation:updated'
+
+// Resolves with the first event of this name that matches the predicate. Attach it before the action.
+function waitForEvent(socketClient, eventName, isMatchingEvent = () => true) {
+  return new Promise((resolve) => {
+    const listener = (event) => {
+      if (isMatchingEvent(event)) {
+        socketClient.off(eventName, listener)
+        resolve(event)
+      }
+    }
+    socketClient.on(eventName, listener)
+  })
+}
+
+describe('business inbox events', () => {
+  it('tells the business staff when a staff member creates a conversation, and no other business', async () => {
+    const { cookieHeader: staffCookieHeader } = await signUpBusinessOwner({
+      businessName: 'Created Shop',
+      email: 'owner@created-shop.test',
+    })
+    const { cookieHeader: bystanderCookieHeader } = await signUpBusinessOwner({
+      businessName: 'Created Bystander Shop',
+      email: 'owner@created-bystander.test',
+    })
+
+    const inboxSocketClient = await connectSocketClient(serverPort, staffCookieHeader)
+    const bystanderSocketClient = await connectSocketClient(serverPort, bystanderCookieHeader)
+    const bystanderEvents = []
+    bystanderSocketClient.on(CONVERSATION_CREATED_EVENT, (event) => bystanderEvents.push(event))
+
+    const createdEventPromise = waitForEvent(inboxSocketClient, CONVERSATION_CREATED_EVENT)
+    const createResponse = await request(app)
+      .post('/api/conversations')
+      .set('Cookie', staffCookieHeader)
+      .send({ customer: { name: 'Inbox Customer' } })
+    expect(createResponse.status).toBe(201)
+
+    const createdEvent = await createdEventPromise
+    expect(createdEvent.conversation).toEqual(createResponse.body.conversation)
+    expect(createdEvent.conversation.customerName).toBe('Inbox Customer')
+
+    expect(bystanderEvents).toEqual([])
+    inboxSocketClient.close()
+    bystanderSocketClient.close()
+  })
+
+  it('tells the business staff when a conversation is updated, without the socket joining its room', async () => {
+    const { cookieHeader: staffCookieHeader, businessId } = await signUpBusinessOwner({
+      businessName: 'Updated Shop',
+      email: 'owner@updated-shop.test',
+    })
+    const conversationId = await insertConversationForBusiness(businessId, 'Update Customer')
+
+    const inboxSocketClient = await connectSocketClient(serverPort, staffCookieHeader)
+    const updatedEventPromise = waitForEvent(
+      inboxSocketClient,
+      CONVERSATION_UPDATED_EVENT,
+      (event) => event.conversation.id === conversationId,
+    )
+    const patchResponse = await request(app)
+      .patch(`/api/conversations/${conversationId}`)
+      .set('Cookie', staffCookieHeader)
+      .send({ status: 'resolved' })
+    expect(patchResponse.status).toBe(200)
+
+    const updatedEvent = await updatedEventPromise
+    expect(updatedEvent.conversation).toEqual(patchResponse.body.conversation)
+    expect(updatedEvent.conversation.status).toBe('resolved')
+    inboxSocketClient.close()
+  })
+
+  it('tells the business staff when a staff message moves a conversation in the inbox', async () => {
+    const { cookieHeader: staffCookieHeader, businessId } = await signUpBusinessOwner({
+      businessName: 'Inbox Message Shop',
+      email: 'owner@inbox-message-shop.test',
+    })
+    const conversationId = await insertConversationForBusiness(businessId, 'Inbox Message Customer')
+
+    const inboxSocketClient = await connectSocketClient(serverPort, staffCookieHeader)
+    const updatedEventPromise = waitForEvent(
+      inboxSocketClient,
+      CONVERSATION_UPDATED_EVENT,
+      (event) => event.conversation.id === conversationId,
+    )
+    const postResponse = await request(app)
+      .post(`/api/conversations/${conversationId}/messages`)
+      .set('Cookie', staffCookieHeader)
+      .send({ body: 'Checking in' })
+    expect(postResponse.status).toBe(201)
+
+    const updatedEvent = await updatedEventPromise
+    expect(updatedEvent.conversation.lastMessageAt).not.toBeNull()
+    inboxSocketClient.close()
+  })
+
+  it('tells the business staff when a visitor starts a chat, and the visitor hears no inbox events', async () => {
+    const { cookieHeader: staffCookieHeader, businessId } = await signUpBusinessOwner({
+      businessName: 'Visitor Inbox Shop',
+      email: 'owner@visitor-inbox-shop.test',
+    })
+    const widgetKey = await widgetKeyForBusiness(businessId)
+
+    const inboxSocketClient = await connectSocketClient(serverPort, staffCookieHeader)
+    const createdEventPromise = waitForEvent(inboxSocketClient, CONVERSATION_CREATED_EVENT)
+    const { sessionToken, conversation } = await startVisitorSession(widgetKey)
+
+    const createdEvent = await createdEventPromise
+    expect(createdEvent.conversation.id).toBe(conversation.id)
+
+    // The visitor's socket must not be in the business room: a staff action afterwards reaches only staff.
+    const visitorSocketClient = await connectVisitorSocketClient(serverPort, sessionToken)
+    const visitorEvents = []
+    visitorSocketClient.on(CONVERSATION_UPDATED_EVENT, (event) => visitorEvents.push(event))
+    visitorSocketClient.on(CONVERSATION_CREATED_EVENT, (event) => visitorEvents.push(event))
+    const staffUpdatedPromise = waitForEvent(inboxSocketClient, CONVERSATION_UPDATED_EVENT)
+    const patchResponse = await request(app)
+      .patch(`/api/conversations/${conversation.id}`)
+      .set('Cookie', staffCookieHeader)
+      .send({ status: 'pending' })
+    expect(patchResponse.status).toBe(200)
+    await staffUpdatedPromise
+
+    expect(visitorEvents).toEqual([])
+    inboxSocketClient.close()
+    visitorSocketClient.close()
+  })
+
+  it('tells the business staff when a visitor message reopens a resolved conversation', async () => {
+    const { cookieHeader: staffCookieHeader, businessId } = await signUpBusinessOwner({
+      businessName: 'Reopen Shop',
+      email: 'owner@reopen-shop.test',
+    })
+    const widgetKey = await widgetKeyForBusiness(businessId)
+    const { sessionToken, conversation } = await startVisitorSession(widgetKey)
+    await request(app)
+      .patch(`/api/conversations/${conversation.id}`)
+      .set('Cookie', staffCookieHeader)
+      .send({ status: 'resolved' })
+
+    const inboxSocketClient = await connectSocketClient(serverPort, staffCookieHeader)
+    const reopenedEventPromise = waitForEvent(
+      inboxSocketClient,
+      CONVERSATION_UPDATED_EVENT,
+      (event) => event.conversation.id === conversation.id && event.conversation.status === 'open',
+    )
+    const visitorPostResponse = await request(app)
+      .post('/api/widget/messages')
+      .set('Authorization', `Bearer ${sessionToken}`)
+      .send({ body: 'Me again' })
+    expect(visitorPostResponse.status).toBe(201)
+
+    const reopenedEvent = await reopenedEventPromise
+    expect(reopenedEvent.conversation.status).toBe('open')
+    inboxSocketClient.close()
+  })
+})

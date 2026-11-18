@@ -60,15 +60,21 @@ Socket.IO runs on the same HTTP server as Express (`src/server.js`). Path: the S
 | client to server | `conversation:join` | `{ conversationId }` | `{ isSuccessful: true, conversationId }`, or `{ isSuccessful: false, error }` |
 | client to server | `conversation:leave` | `{ conversationId }` | Same shape as join |
 | server to client | `message:created` | `{ conversationId, message }` | none, sent after the message is saved |
+| server to client | `conversation:created` | `{ conversation }` | none, sent to the business room after the commit |
+| server to client | `conversation:updated` | `{ conversation }` | none, sent to the business room after the commit |
 
 - Each conversation has one room, named `conversation:<conversationId>`.
 - A socket can join only a conversation that belongs to its own business. Another business's conversation, a missing one and a malformed id all return `Conversation not found.`
 - `message:created` is sent when `POST /api/conversations/:conversationId/messages` saves a message. Only sockets that joined the room receive it.
+- Each business also has one room, named `business:<businessId>`. Every staff socket joins it automatically on connect, with no join request. Visitor sockets never join it.
+- `conversation:created` is sent when a staff member creates a conversation (`POST /api/conversations`) or a visitor starts a chat (`POST /api/widget/sessions`).
+- `conversation:updated` is sent when a conversation's status, mode or assignee changes (`PATCH`), its labels change (`PUT .../labels`), or a staff or visitor message is saved. A visitor message can reopen a resolved conversation.
+- Both inbox events carry the full conversation object, the same shape as `GET /api/conversations/:conversationId`. The inbox list can replace or insert the row from the event, with no refetch.
 
 ### Layout
 
-- `realtime/socketGateway.js`: authentication, join and leave handlers.
-- `realtime/conversationRealtimePublisher.js`: sends `message:created` to a room.
+- `realtime/socketGateway.js`: authentication, join and leave handlers. Puts staff sockets in their business room.
+- `realtime/conversationRealtimePublisher.js`: sends `message:created` to a conversation room, and `conversation:created` / `conversation:updated` to a business room.
 - `realtime/realtimeEventNames.js`, `realtime/conversationRoomNames.js`: shared names.
 
 ## Website widget (customer chat)

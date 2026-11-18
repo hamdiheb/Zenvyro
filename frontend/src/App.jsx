@@ -4,7 +4,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute.jsx'
 import { SignInPage } from './auth/SignInPage.jsx'
 import { SignUpPage } from './auth/SignUpPage.jsx'
 import { OverviewPage } from './dashboard/OverviewPage.jsx'
-import { AppShell } from './components/layout/AppShell'
+import { AgentInboxPage } from './agent/AgentInboxPage.jsx'
 
 // Placeholder for routes whose page lands in a later commit.
 function RoutePlaceholder({ title }) {
@@ -30,7 +30,15 @@ export function App() {
           path="/agent"
           element={
             <ProtectedRoute>
-              <AppShell title="Inbox" />
+              <AgentInboxPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agent/conversations/:conversationId"
+          element={
+            <ProtectedRoute>
+              <AgentInboxPage />
             </ProtectedRoute>
           }
         />

@@ -4,12 +4,14 @@ import { MessagesSquare } from 'lucide-react'
 import { AppShell } from '../components/layout/AppShell'
 import { ConversationListPane } from '../components/inbox/ConversationListPane'
 import { ConversationThreadPane } from '../components/inbox/ConversationThreadPane'
+import { ConversationDetailsPane } from '../components/inbox/ConversationDetailsPane'
 import { EmptyState } from '../components/ui/EmptyState'
 import { Spinner } from '../components/ui/Spinner'
-import { postConversationMessage, updateConversation } from '../api/conversationsApi.js'
+import { postConversationMessage, setConversationLabels, updateConversation } from '../api/conversationsApi.js'
 import { useConversation } from '../hooks/useConversation.js'
 import { useConversationList } from '../hooks/useConversationList.js'
 import { useConversationMessages } from '../hooks/useConversationMessages.js'
+import { useLabels } from '../hooks/useLabels.js'
 import { useCurrentUser } from '../hooks/useCurrentUser.jsx'
 import { useConversationRoom, useMessageCreatedListener, useRealtimeSocket } from '../hooks/useRealtimeSocket.js'
 import { useToast } from '../hooks/useToast.jsx'
@@ -18,6 +20,7 @@ import styles from './AgentInboxPage.module.css'
 const LIST_VIEWS = ['mine', 'unassigned', 'all']
 const LIST_STATUSES = ['open', 'pending', 'resolved', 'escalated']
 const CONFLICT_STATUS_CODE = 409
+const WIDE_SCREEN_MINIMUM_WIDTH = 1200
 
 const STATUS_CHANGE_MESSAGES = {
   open: 'Conversation reopened.',
@@ -35,6 +38,10 @@ export function AgentInboxPage() {
   const { currentUser } = useCurrentUser()
   const { showToast } = useToast()
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [isSavingActions, setIsSavingActions] = useState(false)
+  // The details pane starts open on wide screens and closed where it would cover the thread.
+  const [isDetailsOpen, setIsDetailsOpen] = useState(() => window.innerWidth >= WIDE_SCREEN_MINIMUM_WIDTH)
+  const { labels: allLabels, createNewLabel } = useLabels()
 
   const requestedView = searchParameters.get('view')
   const requestedStatus = searchParameters.get('status')
@@ -118,6 +125,43 @@ export function AgentInboxPage() {
     }
   }
 
+  // Runs one details-pane change (assign, unassign, labels) and stores the conversation it returns.
+  const saveConversationChange = async (requestChange, successMessage) => {
+    setIsSavingActions(true)
+    try {
+      const changeResponse = await requestChange()
+      storeUpdatedConversation(changeResponse.conversation)
+      if (successMessage) {
+        showToast({ tone: 'success', message: successMessage })
+      }
+      refreshConversationList()
+    } catch (error) {
+      showToast({ tone: 'error', message: error.message })
+    } finally {
+      setIsSavingActions(false)
+    }
+  }
+
+  const assignToMe = () =>
+    saveConversationChange(
+      () => updateConversation(conversationId, { assignedAgentId: currentUser.id }),
+      'Conversation assigned to you.',
+    )
+
+  const unassign = () =>
+    saveConversationChange(() => updateConversation(conversationId, { assignedAgentId: null }), 'Conversation unassigned.')
+
+  const setLabels = (labelIds) => saveConversationChange(() => setConversationLabels(conversationId, labelIds))
+
+  const createLabelForPicker = async (newLabelFields) => {
+    try {
+      return await createNewLabel(newLabelFields)
+    } catch (error) {
+      showToast({ tone: 'error', message: error.message })
+      return null
+    }
+  }
+
   const renderThreadArea = () => {
     if (!conversationId) {
       return (
@@ -154,6 +198,8 @@ export function AgentInboxPage() {
         onStatusChange={changeStatus}
         isUpdatingStatus={isUpdatingStatus}
         onBack={returnToList}
+        onToggleDetails={() => setIsDetailsOpen((isOpen) => !isOpen)}
+        isDetailsOpen={isDetailsOpen}
       />
     )
   }
@@ -178,6 +224,19 @@ export function AgentInboxPage() {
           onSelectConversation={selectConversation}
         />
         <div className={`${styles.threadArea} ${hasOpenThread ? styles.threadAreaFilled : ''}`}>{renderThreadArea()}</div>
+        {hasOpenThread && isDetailsOpen && (
+          <ConversationDetailsPane
+            conversation={selectedConversation.conversation}
+            currentUser={currentUser}
+            allLabels={allLabels}
+            isSaving={isSavingActions}
+            onAssignToMe={assignToMe}
+            onUnassign={unassign}
+            onSetLabels={setLabels}
+            onCreateLabel={createLabelForPicker}
+            onClose={() => setIsDetailsOpen(false)}
+          />
+        )}
       </div>
     </AppShell>
   )

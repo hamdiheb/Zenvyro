@@ -1,0 +1,60 @@
+.detailsPane {
+  display: flex;
+  flex-direction: column;
+  width: var(--details-pane-width);
+  flex-shrink: 0;
+  background: var(--color-app-background);
+  border-left: 1px solid var(--color-border);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.title {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+
+.cards {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  overflow-y: auto;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-small);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
+/* Below 1200px the details pane floats over the thread instead of squeezing it. */
+@media (max-width: 1200px) {
+  .detailsPane {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 15;
+    box-shadow: var(--shadow-popover);
+  }
+}
+
+@media (max-width: 600px) {
+  .detailsPane {
+    width: 100%;
+  }
+}

@@ -123,6 +123,8 @@ Labels belong to a business. Names are unique per business (409 on a duplicate).
 
 Every conversation object (single and list) includes `labels: [{ id, name, colorHex }]`, read in the same query.
 
+Every conversation object also includes `lastMessage: { preview, senderType, createdAt }` for the inbox preview, or `null` before the first message. `preview` is the newest message body cut to 200 characters.
+
 ### Layout
 
 - `routes/labelsRoutes.js`, `controllers/labelsController.js`, `services/labelsService.js`, `repositories/labelsRepository.js`

@@ -27,6 +27,18 @@ const CONVERSATION_NOT_FOUND_MESSAGE = 'Conversation not found.'
 const CUSTOMER_NOT_FOUND_MESSAGE = 'Customer not found.'
 const CONVERSATION_RESOLVED_MESSAGE = 'This conversation is resolved. Reopen it before sending a message.'
 
+// The newest message, for the inbox preview. null when the conversation has no messages yet.
+function toPublicLastMessage(conversationRow) {
+  if (conversationRow.last_message_preview === null || conversationRow.last_message_preview === undefined) {
+    return null
+  }
+  return {
+    preview: conversationRow.last_message_preview,
+    senderType: conversationRow.last_message_sender_type,
+    createdAt: conversationRow.last_message_created_at,
+  }
+}
+
 function toPublicConversation(conversationRow) {
   return {
     id: conversationRow.id,
@@ -48,6 +60,7 @@ function toPublicConversation(conversationRow) {
       currencies: conversationRow.origin_currencies,
       detectedAt: conversationRow.origin_detected_at,
     },
+    lastMessage: toPublicLastMessage(conversationRow),
     lastMessageAt: conversationRow.last_message_at,
     resolvedAt: conversationRow.resolved_at,
     createdAt: conversationRow.created_at,

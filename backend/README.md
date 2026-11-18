@@ -87,8 +87,10 @@ Widget keys are `wk_` followed by 32 lowercase hex characters. For local develop
 
 | Method | Path | Auth | Success | Notes |
 |---|---|---|---|---|
-| POST | `/sessions` | `widgetKey` in body | 201 `{ sessionToken, customer, conversation }` | Creates the visitor customer, a conversation and a session token. `name` (default "Website visitor") and `email` are optional. Unknown key: 401. |
-| GET | `/session` | `Authorization: Bearer <sessionToken>` | 200 `{ conversation, messages }` | The visitor's conversation and newest 50 messages, oldest first. Only visitor-safe fields. |
+| POST | `/sessions` | `widgetKey` in body | 201 `{ sessionToken, business, customer, conversation }` | Creates the visitor customer, a conversation and a session token. `name` (default "Website visitor") and `email` are optional. Unknown key: 401. |
+| GET | `/session` | `Authorization: Bearer <sessionToken>` | 200 `{ business, conversation, messages }` | The visitor's conversation and newest 50 messages, oldest first. Only visitor-safe fields. |
+
+`business` is `{ name }`, the display name the widget shows in its header. No other business data is sent to visitors.
 | POST | `/messages` | `Authorization: Bearer <sessionToken>` | 201 `{ message }` | Body `{ body }`, 1 to 5000 characters. Saved as a `customer` message. A resolved conversation is reopened. |
 
 ### Realtime for visitors

@@ -53,6 +53,8 @@ describe('POST /api/widget/sessions', () => {
 
     expect(response.status).toBe(201)
     expect(response.body.sessionToken).toEqual(expect.any(String))
+    expect(response.body.business).toEqual({ name: 'Widget Shop' })
+    expect(response.body.businessId).toBeUndefined()
     expect(response.body.customer.name).toBe('Visitor Ada')
     expect(response.body.conversation.id).toEqual(expect.any(String))
 
@@ -180,6 +182,7 @@ describe('GET /api/widget/session', () => {
       .set('Authorization', `Bearer ${sessionToken}`)
 
     expect(response.status).toBe(200)
+    expect(response.body.business).toEqual({ name: 'Read Session Shop' })
     expect(response.body.conversation).toEqual({
       id: conversation.id,
       status: 'open',

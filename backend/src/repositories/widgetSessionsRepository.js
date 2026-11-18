@@ -14,13 +14,18 @@ export async function insertWidgetSession(
   return result.rows[0]
 }
 
-// Returns the widget visitor only while the session has not expired.
+// Returns the widget visitor, with the business's display name, only while the session has not expired.
 export async function findLiveWidgetSessionByTokenHash(databaseExecutor, tokenHash) {
   const result = await databaseExecutor.query(
-    `SELECT id, business_id, customer_id, conversation_id
+    `SELECT widget_sessions.id,
+            widget_sessions.business_id,
+            widget_sessions.customer_id,
+            widget_sessions.conversation_id,
+            businesses.name AS business_name
      FROM widget_sessions
-     WHERE token_hash = $1
-       AND expires_at > now()`,
+     JOIN businesses ON businesses.id = widget_sessions.business_id
+     WHERE widget_sessions.token_hash = $1
+       AND widget_sessions.expires_at > now()`,
     [tokenHash],
   )
   return result.rows[0] ?? null

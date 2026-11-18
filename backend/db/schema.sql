@@ -87,6 +87,7 @@ CREATE TABLE conversations (
 CREATE INDEX conversations_business_status_idx ON conversations (business_id, status);
 CREATE INDEX conversations_business_assigned_agent_idx ON conversations (business_id, assigned_agent_id);
 CREATE INDEX conversations_customer_id_idx ON conversations (customer_id);
+CREATE INDEX conversations_business_last_message_idx ON conversations (business_id, last_message_at DESC, id DESC);
 
 CREATE TABLE messages (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -66,11 +66,16 @@ async function leaveConversationRoom(socket, leaveRequest, acknowledgeCallback) 
 
 // The browser sends the same HttpOnly session cookie that the REST API uses, so the socket
 // is checked against the sessions table exactly like a REST request.
+// A socket that sends a widget session token is always a visitor, even if a staff cookie comes with it:
+// the widget iframe shares the staff app's origin, so a browser signed in as staff sends both.
 async function authenticateSocketConnection(socket, nextFunction) {
   try {
+    if (socket.handshake.auth?.widgetSessionToken !== undefined) {
+      return await authenticateWidgetVisitor(socket, nextFunction)
+    }
     const sessionToken = socket.request.cookies?.[environmentConfig.sessionCookieName]
     if (!sessionToken) {
-      return authenticateWidgetVisitor(socket, nextFunction)
+      return nextFunction(new Error(NOT_SIGNED_IN_MESSAGE))
     }
 
     const sessionRow = await findLiveSessionByTokenHash(pool, hashSessionToken(sessionToken))

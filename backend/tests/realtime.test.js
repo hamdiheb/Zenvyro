@@ -215,12 +215,14 @@ describe('message broadcast to a conversation room', () => {
 })
 
 // Connects as a website visitor. The widget session token goes in the handshake auth object, not a cookie.
-function connectVisitorSocketClient(serverPort, widgetSessionToken) {
+// cookieHeader simulates a browser that is also signed in as staff on the same origin as the widget iframe.
+function connectVisitorSocketClient(serverPort, widgetSessionToken, cookieHeader = null) {
   const socketClient = createSocketClient(`http://localhost:${serverPort}`, {
     transports: ['websocket'],
     forceNew: true,
     reconnection: false,
     auth: { widgetSessionToken },
+    extraHeaders: cookieHeader ? { Cookie: cookieHeader } : {},
   })
   return new Promise((resolve, reject) => {
     socketClient.once('connect', () => resolve(socketClient))
@@ -270,6 +272,34 @@ describe('website visitor sockets', () => {
     const receivedEvent = await replyReceivedPromise
     expect(receivedEvent.conversationId).toBe(conversation.id)
     expect(receivedEvent.message.body).toBe('Thanks for waiting, here is your answer')
+    visitorSocketClient.close()
+  })
+
+  it('treats a socket with a widget token as a visitor even when the browser also sends a staff cookie', async () => {
+    const { cookieHeader: staffCookieHeader, businessId } = await signUpBusinessOwner({
+      businessName: 'Same Browser Shop',
+      email: 'owner@same-browser-shop.test',
+    })
+    const widgetKey = await widgetKeyForBusiness(businessId)
+    const { sessionToken, conversation } = await startVisitorSession(widgetKey)
+
+    const visitorSocketClient = await connectVisitorSocketClient(serverPort, sessionToken, staffCookieHeader)
+    const visitorInboxEvents = []
+    visitorSocketClient.on('conversation:updated', (event) => visitorInboxEvents.push(event))
+    const replyReceivedPromise = new Promise((resolve) => {
+      visitorSocketClient.once(MESSAGE_CREATED_EVENT, resolve)
+    })
+
+    const replyResponse = await request(app)
+      .post(`/api/conversations/${conversation.id}/messages`)
+      .set('Cookie', staffCookieHeader)
+      .send({ body: 'Reply while the agent is signed in in the same browser' })
+    expect(replyResponse.status).toBe(201)
+
+    const receivedEvent = await replyReceivedPromise
+    expect(receivedEvent.message.body).toBe('Reply while the agent is signed in in the same browser')
+    // It is a visitor socket, so it must not be in the business room.
+    expect(visitorInboxEvents).toEqual([])
     visitorSocketClient.close()
   })
 

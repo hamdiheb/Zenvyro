@@ -18,6 +18,11 @@
   background: var(--color-surface-subtle);
 }
 
+.threadAreaFilled {
+  align-items: stretch;
+  justify-content: stretch;
+}
+
 /* On narrow screens the inbox shows one pane at a time: the list, or the open conversation. */
 @media (max-width: 900px) {
   .threadArea {

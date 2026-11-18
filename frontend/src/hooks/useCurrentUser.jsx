@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { disconnectStaffSocket } from './useRealtimeSocket.js'
 import { fetchCurrentUser, signInStaffUser, signOutStaffUser, signUpBusinessOwner } from '../api/authenticationApi.js'
 
 // GET /me does not return the business name yet, so the name from sign-up is remembered on this device.
@@ -69,6 +70,7 @@ export function SessionProvider({ children }) {
     try {
       await signOutStaffUser()
     } finally {
+      disconnectStaffSocket()
       setCurrentUser(null)
     }
   }, [])

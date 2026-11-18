@@ -27,7 +27,7 @@ Only `VITE_` variables reach the browser, so this file never holds secrets.
 | Variable | Default | Purpose |
 |---|---|---|
 | `VITE_BACKEND_ORIGIN` | `http://localhost:4000` | Where the dev proxy sends `/api` and `/socket.io` |
-| `VITE_DEMO_WIDGET_KEY` | none | Widget key that `/demo-store` embeds. Use the value in `businesses.widget_key` (`wk_` + 32 hex characters). |
+| `VITE_DEMO_WIDGET_KEY` | none | Widget key that `/demo-store` embeds. `.env.example` holds the seeded Acme Shoes key; any value from `businesses.widget_key` works. |
 
 ## Routes
 
@@ -53,7 +53,7 @@ Only `VITE_` variables reach the browser, so this file never holds secrets.
 - `zenvyro:host-viewport` (host → widget): `{ isCompactLayout }`, true at 480px wide or less. The window then fills the screen.
 - `zenvyro:widget-state` (widget → host): `{ isOpen }`. The loader resizes the iframe to 88×88 when closed and 402×660 when open (full screen on phones).
 
-`window.ZenvyroWidget.destroy()` removes the widget. The visitor's 30-day session token is stored in the iframe's `localStorage` under `zenvyro.widgetSession.{widgetKey}` and resumed with `GET /api/widget/session`. The visitor socket connects with `auth: { widgetSessionToken }`.
+`data-business-name` is optional. It is shown until the widget session returns the business's own name. `window.ZenvyroWidget.destroy()` removes the widget. The visitor's 30-day session token is stored in the iframe's `localStorage` under `zenvyro.widgetSession.{widgetKey}` and resumed with `GET /api/widget/session`. The visitor socket connects with `auth: { widgetSessionToken }`.
 
 ## Design tokens
 
@@ -96,13 +96,9 @@ Reserved slots for later weeks: `ReplyComposer` takes a `reviewPanel` prop for t
   - `useWidgetChat`
   - `useToast`
 
-## Known backend gaps
+## Backend features not used yet
 
-These need backend commits. The frontend works around them for now.
+The backend branch now has two features this UI does not use yet:
 
-1. **The seeded widget key fails validation.** `backend/db/seed.sql` uses `wk_acme_demo_local_only`, but `validateStartWidgetSessionMiddleware` only accepts `wk_` + 32 hex characters. Until the seed is fixed, use the key of a business created through sign-up.
-2. **`GET /me` has no business name.** The sidebar shows the name saved at sign-up on this device, or "Your workspace".
-3. **The conversation list has no last-message preview.** List rows show the customer's email instead.
-4. **The widget session responses have no business name.** The loader passes it with `data-business-name`.
-5. **There is no staff list endpoint** (`GET /api/users`). Assignment offers only "Assign to me" and "Unassign".
-6. **Realtime only covers the open conversation's room.** The list refetches every 20s and on every `message:created`. A per-business room with `conversation:created` and `conversation:updated` events would make the list fully live.
+1. **`GET /api/users`** (staff of the business). The details pane still offers only "Assign to me" and "Unassign". An agent picker can replace them.
+2. **Per-business realtime room** with `conversation:created` and `conversation:updated`. The list still refetches every 20s and on every `message:created`. It can insert or replace rows from these events instead.

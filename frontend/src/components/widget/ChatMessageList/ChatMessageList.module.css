@@ -1,0 +1,24 @@
+.messageList {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4);
+  overflow-y: auto;
+  background: var(--color-surface);
+}
+
+.welcome {
+  margin-bottom: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-medium);
+  background: var(--color-primary-soft);
+  font-size: var(--font-size-small);
+  color: var(--color-text);
+}
+
+.dayLabel {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  color: var(--color-text-muted);
+}

@@ -22,13 +22,13 @@ export async function signUp(request, response) {
 }
 
 export async function signIn(request, response) {
-  const { user, sessionToken } = await signInUser(request.validatedBody)
+  const { user, business, sessionToken } = await signInUser(request.validatedBody)
   setSessionCookie(response, sessionToken)
-  response.status(200).json({ user })
+  response.status(200).json({ user, business })
 }
 
 export function getCurrentUser(request, response) {
-  response.status(200).json({ user: request.authenticatedUser })
+  response.status(200).json({ user: request.authenticatedUser, business: request.authenticatedBusiness })
 }
 
 export async function signOut(request, response) {

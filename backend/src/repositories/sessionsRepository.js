@@ -11,7 +11,7 @@ export async function insertSession(databaseExecutor, { userId, tokenHash, durat
   return result.rows[0]
 }
 
-// Returns the user behind a session only while that session has not expired.
+// Returns the user behind a session, with their business's name and slug, only while that session has not expired.
 export async function findLiveSessionByTokenHash(databaseExecutor, tokenHash) {
   const result = await databaseExecutor.query(
     `SELECT sessions.id AS session_id,
@@ -19,9 +19,12 @@ export async function findLiveSessionByTokenHash(databaseExecutor, tokenHash) {
             users.business_id,
             users.name,
             users.email,
-            users.role
+            users.role,
+            businesses.name AS business_name,
+            businesses.slug AS business_slug
      FROM sessions
      JOIN users ON users.id = sessions.user_id
+     JOIN businesses ON businesses.id = users.business_id
      WHERE sessions.token_hash = $1
        AND sessions.expires_at > now()`,
     [tokenHash],

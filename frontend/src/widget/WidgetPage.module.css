@@ -1,0 +1,30 @@
+.widgetFrame {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.windowSlot,
+.launcherSlot {
+  position: absolute;
+  right: 16px;
+  pointer-events: auto;
+}
+
+.launcherSlot {
+  bottom: 16px;
+}
+
+/* 16px margin + 56px launcher + 12px gap. */
+.windowSlot {
+  bottom: 84px;
+}
+
+/* On phones the open window fills the screen and its header's minimize button closes it. */
+.compact .windowSlot {
+  inset: 0;
+}
+
+.compact.isOpen .launcherSlot {
+  display: none;
+}

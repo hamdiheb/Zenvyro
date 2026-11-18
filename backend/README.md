@@ -21,8 +21,8 @@ Base path: `/api/authentication`. Sessions are opaque random tokens. No JWT is u
 | Method | Path | Session needed | Success | Notes |
 |---|---|---|---|---|
 | POST | `/sign-up` | no | 201 `{ user, business }` | Creates the business and its owner in one transaction, starts a session, sets the cookie. |
-| POST | `/sign-in` | no | 200 `{ user }` | Starts a new session and sets the cookie. Wrong password and unknown email both return the same 401. |
-| GET | `/me` | yes | 200 `{ user }` | Returns the signed-in user. |
+| POST | `/sign-in` | no | 200 `{ user, business }` | Starts a new session and sets the cookie. Wrong password and unknown email both return the same 401. |
+| GET | `/me` | yes | 200 `{ user, business }` | Returns the signed-in user and their business (`id`, `name`, `slug`). |
 | POST | `/sign-out` | yes | 204 | Deletes the session row and clears the cookie. |
 
 Errors are JSON: `{ "error": "message" }`. Expected failures return 400 (validation), 401 (not signed in or wrong credentials) or 409 (email already registered).
@@ -43,3 +43,114 @@ Errors are JSON: `{ "error": "message" }`. Expected failures return 400 (validat
 - `services/authenticationService.js`: sign-up, sign-in and sign-out rules.
 - `services/sessionTokenService.js`: token generation and hashing.
 - `repositories/*Repository.js`: parameterized SQL, one module per table.
+
+## Realtime (Socket.IO)
+
+Socket.IO runs on the same HTTP server as Express (`src/server.js`). Path: the Socket.IO default (`/socket.io`). Same CORS origins as the REST API, with credentials.
+
+### Connecting
+
+- The browser sends the `zenvyro_session` cookie during the handshake. Each connection is checked against the `sessions` table, the same way REST requests are.
+- No cookie, an unknown session, or an expired session fails the connection with an error message (`You must be signed in.` or `Your session has ended. Please sign in again.`).
+
+### Events
+
+| Direction | Event | Payload | Acknowledgement |
+|---|---|---|---|
+| client to server | `conversation:join` | `{ conversationId }` | `{ isSuccessful: true, conversationId }`, or `{ isSuccessful: false, error }` |
+| client to server | `conversation:leave` | `{ conversationId }` | Same shape as join |
+| server to client | `message:created` | `{ conversationId, message }` | none, sent after the message is saved |
+| server to client | `conversation:created` | `{ conversation }` | none, sent to the business room after the commit |
+| server to client | `conversation:updated` | `{ conversation }` | none, sent to the business room after the commit |
+
+- Each conversation has one room, named `conversation:<conversationId>`.
+- A socket can join only a conversation that belongs to its own business. Another business's conversation, a missing one and a malformed id all return `Conversation not found.`
+- `message:created` is sent when `POST /api/conversations/:conversationId/messages` saves a message. Only sockets that joined the room receive it.
+- Each business also has one room, named `business:<businessId>`. Every staff socket joins it automatically on connect, with no join request. Visitor sockets never join it.
+- `conversation:created` is sent when a staff member creates a conversation (`POST /api/conversations`) or a visitor starts a chat (`POST /api/widget/sessions`).
+- `conversation:updated` is sent when a conversation's status, mode or assignee changes (`PATCH`), its labels change (`PUT .../labels`), or a staff or visitor message is saved. A visitor message can reopen a resolved conversation.
+- Both inbox events carry the full conversation object, the same shape as `GET /api/conversations/:conversationId`. The inbox list can replace or insert the row from the event, with no refetch.
+
+### Layout
+
+- `realtime/socketGateway.js`: authentication, join and leave handlers. Puts staff sockets in their business room.
+- `realtime/conversationRealtimePublisher.js`: sends `message:created` to a conversation room, and `conversation:created` / `conversation:updated` to a business room.
+- `realtime/realtimeEventNames.js`, `realtime/conversationRoomNames.js`: shared names.
+
+## Website widget (customer chat)
+
+Base path: `/api/widget`. Visitors are anonymous customers, not staff. They never use the staff cookie. The widget key identifies the business and is public (it is in the embed code). Visitor tokens are random and stored only as SHA-256 hashes in `widget_sessions`. Sessions last 30 days.
+
+Widget routes accept any browser origin, because they use a bearer token and no cookie.
+
+Widget keys are `wk_` followed by 32 lowercase hex characters. For local development, `db/seed.sql` creates the Acme Shoes demo business with the key `wk_ace5ace5ace5ace5ace5ace5ace5ace5`.
+
+| Method | Path | Auth | Success | Notes |
+|---|---|---|---|---|
+| POST | `/sessions` | `widgetKey` in body | 201 `{ sessionToken, business, customer, conversation }` | Creates the visitor customer, a conversation and a session token. `name` (default "Website visitor") and `email` are optional. Unknown key: 401. |
+| GET | `/session` | `Authorization: Bearer <sessionToken>` | 200 `{ business, conversation, messages }` | The visitor's conversation and newest 50 messages, oldest first. Only visitor-safe fields. |
+| POST | `/messages` | `Authorization: Bearer <sessionToken>` | 201 `{ message }` | Body `{ body }`, 1 to 5000 characters. Saved as a `customer` message. A resolved conversation is reopened. |
+
+`business` is `{ name }`, the display name the widget shows in its header. No other business data is sent to visitors.
+
+### Realtime for visitors
+
+A visitor connects to Socket.IO with `io(url, { auth: { widgetSessionToken } })`. The server places the socket in its own room `conversation:<conversationId>` on connect, so it receives `message:created` for its conversation. Joining any other conversation gets `Conversation not found.`
+
+A socket that sends a `widgetSessionToken` is always authenticated as a visitor, even when the browser also sends a staff `zenvyro_session` cookie (for example, a staff member testing the widget on `/demo-store` in the same browser). It never joins the business room.
+
+### Layout
+
+- `routes/widgetRoutes.js`, `controllers/widgetController.js`
+- `services/widgetSessionService.js`: start session, read conversation, post visitor message, token lookup
+- `middleware/requireWidgetSessionMiddleware.js`, `validateStartWidgetSessionMiddleware.js`
+- `repositories/widgetSessionsRepository.js`
+- `db/migrations/002_widget_sessions.sql` (also in `db/schema.sql`)
+
+## Agent inbox: assignment and labels
+
+### Assignment
+
+`PATCH /api/conversations/:conversationId` also accepts `assignedAgentId`. Send a staff user's id to assign, or `null` to unassign. Other fields in the same request are unchanged when `assignedAgentId` is absent. The assignee must be a staff member of the same business, otherwise 400. The inbox views are `GET /api/conversations?view=mine` (assigned to the signed-in user), `unassigned`, and `all`.
+
+`GET /api/users` lists the staff of the signed-in user's business for the agent picker: 200 `{ users: [{ id, name, email, role }] }`, sorted by name. It needs a staff session (401 otherwise). It never returns password data or staff from other businesses.
+
+### Labels
+
+Labels belong to a business. Names are unique per business (409 on a duplicate).
+
+| Method | Path | Success | Notes |
+|---|---|---|---|
+| GET | `/api/labels` | 200 `{ labels: [{ id, name, colorHex }] }` | Sorted by name. |
+| POST | `/api/labels` | 201 `{ label }` | Body `{ name, colorHex? }`. Name 1 to 40 characters. `colorHex` defaults to `#4a6cf7`. |
+| PUT | `/api/conversations/:conversationId/labels` | 200 `{ conversation }` | Body `{ labelIds: [...] }` replaces the whole label set. Up to 20 ids. Every label must belong to this business, otherwise 400. |
+
+Every conversation object (single and list) includes `labels: [{ id, name, colorHex }]`, read in the same query.
+
+Every conversation object also includes `lastMessage: { preview, senderType, createdAt }` for the inbox preview, or `null` before the first message. `preview` is the newest message body cut to 200 characters.
+
+### Layout
+
+- `routes/labelsRoutes.js`, `controllers/labelsController.js`, `services/labelsService.js`, `repositories/labelsRepository.js`
+- `middleware/validateCreateLabelMiddleware.js`, `validateSetConversationLabelsMiddleware.js`
+- `utils/labelValues.js`
+
+## Visitor origin (geo detection)
+
+When a website visitor starts a chat (`POST /api/widget/sessions`), the API works out where they are from their IP address. The result is stored once on the conversation and shown to agents as `origin` on every conversation object.
+
+- **Lookup:** the IP goes to `GEO_IP_LOOKUP_BASE_URL` (ipwho.is by default) to get a two-letter country code.
+- **Enrichment:** the country code goes to `REST_COUNTRIES_BASE_URL` for the name, region, flag, languages and currencies.
+- **Client IP:** taken from the socket address, or from the forwarded address when `TRUST_PROXY_HOP_COUNT` is set (one hop behind a load balancer).
+- **Timeouts:** each call waits at most 3 seconds, and the lookup runs before the database transaction opens.
+
+| `origin.status` | Meaning |
+|---|---|
+| `detected` | Country found. Name, region, flag, languages and currencies are filled when REST Countries answers. |
+| `private_address` | Loopback or private IP. Not looked up. |
+| `unavailable` | Lookup failed or the provider does not know the address. The chat still starts. |
+| `not_attempted` | Conversations created by staff (no visitor IP) keep this status. |
+
+`origin` shape: `{ status, countryCode, countryName, region, flagImageUrl, languages: [string], currencies: [{ code, name, symbol }], detectedAt }`. Visitors never see it.
+
+Layout: `services/geoOriginService.js`, stored with `repositories/conversationsRepository.js` (`updateConversationOrigin`). `GEO_IP_API_KEY` is not used by ipwho.is, which needs no key.

@@ -1,0 +1,40 @@
+.inbox {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-card);
+}
+
+.threadArea {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-subtle);
+}
+
+.threadAreaFilled {
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+/* On narrow screens the inbox shows one pane at a time: the list, or the open conversation. */
+@media (max-width: 900px) {
+  .threadArea {
+    display: none;
+  }
+
+  .hasSelection > :first-child {
+    display: none;
+  }
+
+  .hasSelection .threadArea {
+    display: flex;
+  }
+}

@@ -17,7 +17,7 @@ export const environmentConfig = Object.freeze({
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean),
-  sessionCookieName: 'saad_session',
+  sessionCookieName: 'zenvyro_session',
   sessionDurationSeconds: THREE_DAYS_IN_SECONDS,
   sessionDurationMilliseconds: THREE_DAYS_IN_SECONDS * 1000,
   isCookieSecure: nodeEnvironment === 'production',

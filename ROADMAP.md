@@ -1,4 +1,4 @@
-# Saas – AI Customer Support Platform with Business Rule Enforcement
+# Zenvyro – AI Customer Support Platform with Business Rule Enforcement
 ## Full Product & Engineering Roadmap
 
 Derived from `Plan.md` and the three images in `Design inspiration/`.
@@ -46,7 +46,7 @@ Saad Product/
 │   ├── src/{dashboard,agent,widget,components,api,hooks,styles}
 │   └── vite.config.js
 ├── docker-compose.yml        (postgres + backend)
-├── postman/Saad.postman_collection.json
+├── postman/Zenvyro.postman_collection.json
 ├── README.md  (root overview)  + backend/README.md + frontend/README.md
 ├── .gitignore  └─ .env.example
 ├── Plan.md   └─ ROADMAP.md

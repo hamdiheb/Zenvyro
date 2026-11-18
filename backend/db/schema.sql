@@ -1,4 +1,4 @@
--- Saad SaaS: full PostgreSQL schema (baseline).
+-- Zenvyro: full PostgreSQL schema (baseline).
 -- Raw SQL only, no ORM. Tables are plural snake_case; timestamps end in _at; booleans start with is_, has_ or can_.
 -- Applied once by the migration runner (node src/db/databaseCommands.js migrate). Later changes go in db/migrations/.
 

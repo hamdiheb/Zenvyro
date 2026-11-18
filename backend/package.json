@@ -1,7 +1,7 @@
 {
-  "name": "saas-backend",
+  "name": "zenvyro-backend",
   "version": "0.1.0",
-  "description": "AI customer support platform API (Express, PostgreSQL, Socket.IO)",
+  "description": "Zenvyro AI customer support platform API (Express, PostgreSQL, Socket.IO)",
   "private": true,
   "type": "module",
   "main": "src/server.js",

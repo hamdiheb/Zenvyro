@@ -1,4 +1,4 @@
-# Backend
+# Zenvyro Backend
 
 Express 5 API for the support platform. Raw SQL on PostgreSQL through `pg`, no ORM.
 
@@ -29,7 +29,7 @@ Errors are JSON: `{ "error": "message" }`. Expected failures return 400 (validat
 
 ### Session design
 
-- **Cookie:** `saad_session`, HttpOnly, SameSite=Lax, path `/`, 3-day lifetime. `Secure` is set when `NODE_ENV=production`.
+- **Cookie:** `zenvyro_session`, HttpOnly, SameSite=Lax, path `/`, 3-day lifetime. `Secure` is set when `NODE_ENV=production`.
 - **Token:** 32 random bytes, base64url encoded. Only the cookie holds the raw value.
 - **Database:** `sessions.token_hash` stores the SHA-256 hex of the token. The raw token is never stored.
 - **Each request** (`/me`, `/sign-out`): the middleware hashes the cookie value and loads the session only if `expires_at` is in the future. An unknown, expired or deleted session gets 401 and the cookie is cleared.

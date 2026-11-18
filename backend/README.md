@@ -21,8 +21,8 @@ Base path: `/api/authentication`. Sessions are opaque random tokens. No JWT is u
 | Method | Path | Session needed | Success | Notes |
 |---|---|---|---|---|
 | POST | `/sign-up` | no | 201 `{ user, business }` | Creates the business and its owner in one transaction, starts a session, sets the cookie. |
-| POST | `/sign-in` | no | 200 `{ user }` | Starts a new session and sets the cookie. Wrong password and unknown email both return the same 401. |
-| GET | `/me` | yes | 200 `{ user }` | Returns the signed-in user. |
+| POST | `/sign-in` | no | 200 `{ user, business }` | Starts a new session and sets the cookie. Wrong password and unknown email both return the same 401. |
+| GET | `/me` | yes | 200 `{ user, business }` | Returns the signed-in user and their business (`id`, `name`, `slug`). |
 | POST | `/sign-out` | yes | 204 | Deletes the session row and clears the cookie. |
 
 Errors are JSON: `{ "error": "message" }`. Expected failures return 400 (validation), 401 (not signed in or wrong credentials) or 409 (email already registered).

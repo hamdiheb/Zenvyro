@@ -100,7 +100,11 @@ export async function signInUser({ email, password }) {
   }
 
   const sessionToken = await createSessionForUser(pool, userRow.id)
-  return { user: toPublicUser(userRow), sessionToken }
+  return {
+    user: toPublicUser(userRow),
+    business: { id: userRow.business_id, name: userRow.business_name, slug: userRow.business_slug },
+    sessionToken,
+  }
 }
 
 export async function signOutSession(sessionTokenHash) {

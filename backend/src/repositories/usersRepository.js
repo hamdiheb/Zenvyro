@@ -12,9 +12,11 @@ export async function insertOwnerUser(databaseExecutor, { businessId, name, emai
 
 export async function findUserWithPasswordByEmail(databaseExecutor, email) {
   const result = await databaseExecutor.query(
-    `SELECT id, business_id, name, email, role, password_hash
+    `SELECT users.id, users.business_id, users.name, users.email, users.role, users.password_hash,
+            businesses.name AS business_name, businesses.slug AS business_slug
      FROM users
-     WHERE email = $1`,
+     JOIN businesses ON businesses.id = users.business_id
+     WHERE users.email = $1`,
     [email],
   )
   return result.rows[0] ?? null

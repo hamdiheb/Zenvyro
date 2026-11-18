@@ -1,0 +1,96 @@
+/*
+ * Zenvyro design tokens. Tokens are named by role, not by colour, so a dark theme only needs
+ * to override this block later (dark mode is deferred).
+ */
+:root {
+  /* Brand */
+  --color-primary: #5b5bf6;
+  --color-primary-hover: #4a4ae0;
+  --color-primary-soft: #eef0ff;
+  --color-on-primary: #ffffff;
+
+  /* Surfaces */
+  --color-app-background: #f5f6fb;
+  --color-page-backdrop: #dfe2ff;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f8f9fc;
+  --color-surface-muted: #f1f2f7;
+  --color-border: #e7e8f0;
+  --color-border-strong: #d6d8e4;
+
+  /* Text */
+  --color-text: #1b1d29;
+  --color-text-muted: #6b6f80;
+  --color-text-subtle: #9a9db0;
+
+  /* Status */
+  --color-success: #16a34a;
+  --color-success-soft: #e8f7ee;
+  --color-warning: #f59e0b;
+  --color-warning-soft: #fef5e4;
+  --color-warning-text: #b45309;
+  --color-danger: #ef4444;
+  --color-danger-soft: #fdecec;
+  --color-info: #3b82f6;
+  --color-info-soft: #eaf1fe;
+
+  /* AI accent: only AI surfaces use it, so AI output always looks different from human output. */
+  --color-ai-start: #6366f1;
+  --color-ai-end: #a78bfa;
+  --gradient-ai: linear-gradient(135deg, var(--color-ai-start) 0%, var(--color-ai-end) 100%);
+  --color-ai-soft: #f1efff;
+
+  /* Message bubbles */
+  --color-bubble-customer: #f1f2f7;
+  --color-bubble-agent: var(--color-primary);
+
+  /* Radius */
+  --radius-small: 8px;
+  --radius-medium: 12px;
+  --radius-large: 20px;
+  --radius-pill: 999px;
+
+  /* Spacing: 4px scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Typography */
+  --font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-size-caption: 12px;
+  --font-size-small: 13px;
+  --font-size-body: 14px;
+  --font-size-large: 16px;
+  --font-size-title: 20px;
+  --font-size-display: 28px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.25;
+  --line-height-body: 1.5;
+
+  /* Elevation */
+  --shadow-card: 0 1px 2px rgba(27, 29, 41, 0.04), 0 4px 16px rgba(27, 29, 41, 0.04);
+  --shadow-popover: 0 8px 28px rgba(27, 29, 41, 0.12), 0 2px 6px rgba(27, 29, 41, 0.06);
+  --shadow-launcher: 0 10px 28px rgba(91, 91, 246, 0.38);
+  --focus-ring: 0 0 0 3px rgba(91, 91, 246, 0.28);
+
+  /* Layout */
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 72px;
+  --navbar-height: 72px;
+  --conversation-list-width: 340px;
+  --details-pane-width: 300px;
+
+  /* Motion */
+  --transition-fast: 120ms ease;
+  --transition-medium: 200ms ease;
+}

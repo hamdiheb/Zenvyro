@@ -107,6 +107,8 @@ A visitor connects to Socket.IO with `io(url, { auth: { widgetSessionToken } })`
 
 `PATCH /api/conversations/:conversationId` also accepts `assignedAgentId`. Send a staff user's id to assign, or `null` to unassign. Other fields in the same request are unchanged when `assignedAgentId` is absent. The assignee must be a staff member of the same business, otherwise 400. The inbox views are `GET /api/conversations?view=mine` (assigned to the signed-in user), `unassigned`, and `all`.
 
+`GET /api/users` lists the staff of the signed-in user's business for the agent picker: 200 `{ users: [{ id, name, email, role }] }`, sorted by name. It needs a staff session (401 otherwise). It never returns password data or staff from other businesses.
+
 ### Labels
 
 Labels belong to a business. Names are unique per business (409 on a duplicate).

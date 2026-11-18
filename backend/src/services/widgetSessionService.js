@@ -61,7 +61,9 @@ export async function startWidgetSessionForWidgetKey({ widgetKey, visitorName, v
 
     await client.query('COMMIT')
     return {
+      businessId: businessRow.id,
       sessionToken,
+      business: { name: businessRow.name },
       customer: { id: customerRow.id, name: customerRow.name },
       conversation: { id: conversationRow.id },
     }
@@ -95,6 +97,7 @@ export async function getWidgetConversationWithRecentMessages({ widgetSession })
   })
 
   return {
+    business: { name: widgetSession.business_name },
     conversation: {
       id: conversationRow.id,
       status: conversationRow.status,

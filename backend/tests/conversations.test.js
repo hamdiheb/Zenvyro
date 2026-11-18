@@ -362,6 +362,28 @@ describe('messages on /api/conversations/:conversationId/messages', () => {
 
     const listResponse = await request(app).get(CONVERSATIONS_PATH).set('Cookie', staff.cookieHeader)
     expect(listResponse.body.conversations[0].lastMessageAt).not.toBeNull()
+    expect(listResponse.body.conversations[0].lastMessage).toEqual({
+      preview: 'fifth',
+      senderType: 'agent',
+      createdAt: expect.any(String),
+    })
+  })
+
+  it('shows a null lastMessage before any message and cuts long previews to 200 characters', async () => {
+    const staff = await signUpBusinessOwner({ businessName: 'Preview Shop', email: 'owner@preview-shop.test' })
+    const customerId = await insertCustomerRow(staff.businessId, { name: 'Linus' })
+    const conversation = await createConversationForCustomer(staff.cookieHeader, customerId)
+
+    const emptyResponse = await request(app)
+      .get(`${CONVERSATIONS_PATH}/${conversation.id}`)
+      .set('Cookie', staff.cookieHeader)
+    expect(emptyResponse.body.conversation.lastMessage).toBeNull()
+
+    await postStaffMessage(staff.cookieHeader, conversation.id, 'x'.repeat(300))
+    const longResponse = await request(app)
+      .get(`${CONVERSATIONS_PATH}/${conversation.id}`)
+      .set('Cookie', staff.cookieHeader)
+    expect(longResponse.body.conversation.lastMessage.preview).toHaveLength(200)
   })
 
   it('refuses to post to a resolved conversation with 409', async () => {

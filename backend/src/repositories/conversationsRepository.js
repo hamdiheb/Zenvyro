@@ -2,6 +2,9 @@
 // Every query filters by business_id so one business can never read another business's rows.
 
 // sort_value is the last_message_at as Postgres text. It becomes the pagination cursor.
+// The newest message is joined for the inbox preview (cut to LAST_MESSAGE_PREVIEW_LENGTH characters);
+// messages_conversation_created_idx makes that one index lookup per conversation.
+const LAST_MESSAGE_PREVIEW_LENGTH = 200
 const SELECT_CONVERSATION_WITH_CUSTOMER = `
   SELECT conversations.id,
          conversations.business_id,
@@ -32,9 +35,19 @@ const SELECT_CONVERSATION_WITH_CUSTOMER = `
             JOIN labels ON labels.id = conversation_labels.label_id
             WHERE conversation_labels.conversation_id = conversations.id),
            '[]'::json
-         ) AS labels
+         ) AS labels,
+         left(last_message.body, ${LAST_MESSAGE_PREVIEW_LENGTH}) AS last_message_preview,
+         last_message.sender_type AS last_message_sender_type,
+         last_message.created_at AS last_message_created_at
   FROM conversations
-  JOIN customers ON customers.id = conversations.customer_id`
+  JOIN customers ON customers.id = conversations.customer_id
+  LEFT JOIN LATERAL (
+    SELECT messages.body, messages.sender_type, messages.created_at
+    FROM messages
+    WHERE messages.conversation_id = conversations.id
+    ORDER BY messages.created_at DESC, messages.id DESC
+    LIMIT 1
+  ) AS last_message ON true`
 
 export async function insertConversation(databaseExecutor, { businessId, customerId }) {
   const result = await databaseExecutor.query(

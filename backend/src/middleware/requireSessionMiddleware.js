@@ -5,7 +5,8 @@ import { findLiveSessionByTokenHash } from '../repositories/sessionsRepository.j
 import { hashSessionToken } from '../services/sessionTokenService.js'
 
 // Checks the session cookie against a live row in the sessions table (not expired).
-// On success it sets request.authenticatedUser and request.sessionTokenHash for the controller.
+// On success it sets request.authenticatedUser, request.authenticatedBusiness and request.sessionTokenHash
+// for the controller.
 export async function requireSessionMiddleware(request, response, nextFunction) {
   const sessionToken = request.cookies?.[environmentConfig.sessionCookieName]
 
@@ -28,6 +29,11 @@ export async function requireSessionMiddleware(request, response, nextFunction) 
     name: sessionRow.name,
     email: sessionRow.email,
     role: sessionRow.role,
+  }
+  request.authenticatedBusiness = {
+    id: sessionRow.business_id,
+    name: sessionRow.business_name,
+    slug: sessionRow.business_slug,
   }
   request.sessionTokenHash = sessionTokenHash
   return nextFunction()

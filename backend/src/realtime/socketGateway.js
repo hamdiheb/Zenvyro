@@ -11,7 +11,7 @@ import {
   CONVERSATION_JOIN_EVENT,
   CONVERSATION_LEAVE_EVENT,
 } from './realtimeEventNames.js'
-import { buildConversationRoomName } from './conversationRoomNames.js'
+import { buildConversationRoomName, buildBusinessRoomName } from './conversationRoomNames.js'
 
 const NOT_SIGNED_IN_MESSAGE = 'You must be signed in.'
 const SESSION_ENDED_MESSAGE = 'Your session has ended. Please sign in again.'
@@ -125,6 +125,9 @@ export function createSocketGateway(httpServer) {
   socketServer.on('connection', (socket) => {
     if (socket.data.widgetSession) {
       socket.join(buildConversationRoomName(socket.data.widgetSession.conversation_id))
+    }
+    if (socket.data.authenticatedUser) {
+      socket.join(buildBusinessRoomName(socket.data.authenticatedUser.businessId))
     }
     socket.on(CONVERSATION_JOIN_EVENT, (joinRequest, acknowledgeCallback) =>
       joinConversationRoom(socket, joinRequest, acknowledgeCallback),

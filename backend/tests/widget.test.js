@@ -1,5 +1,7 @@
 import request from 'supertest'
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { jest } from '@jest/globals'
 import { app } from '../src/app.js'
 import { pool } from '../src/db/databasePool.js'
@@ -11,6 +13,7 @@ import {
 
 const WIDGET_SESSIONS_PATH = '/api/widget/sessions'
 const UNKNOWN_WIDGET_KEY = 'wk_00000000000000000000000000000000'
+const SEED_FILE_PATH = fileURLToPath(new URL('../db/seed.sql', import.meta.url))
 
 async function signUpBusinessAndReadWidgetKey({ businessName, email }) {
   const signUpResponse = await request(app)
@@ -50,6 +53,8 @@ describe('POST /api/widget/sessions', () => {
 
     expect(response.status).toBe(201)
     expect(response.body.sessionToken).toEqual(expect.any(String))
+    expect(response.body.business).toEqual({ name: 'Widget Shop' })
+    expect(response.body.businessId).toBeUndefined()
     expect(response.body.customer.name).toBe('Visitor Ada')
     expect(response.body.conversation.id).toEqual(expect.any(String))
 
@@ -96,6 +101,25 @@ describe('POST /api/widget/sessions', () => {
     const response = await request(app).post(WIDGET_SESSIONS_PATH).send({ widgetKey: UNKNOWN_WIDGET_KEY })
     expect(response.status).toBe(401)
     expect(response.body.error).toBe('The widget key is not valid.')
+  })
+
+  it('accepts the widget key of the seeded Acme Shoes demo business', async () => {
+    await pool.query(readFileSync(SEED_FILE_PATH, 'utf8'))
+    const keyResult = await pool.query(`SELECT widget_key FROM businesses WHERE slug = 'acme-shoes'`)
+
+    const response = await request(app).post(WIDGET_SESSIONS_PATH).send({ widgetKey: keyResult.rows[0].widget_key })
+
+    expect(response.status).toBe(201)
+  })
+
+  it('moves a database seeded with the old malformed demo key to the valid key', async () => {
+    await pool.query(
+      `INSERT INTO businesses (name, slug, widget_key) VALUES ('Acme Shoes', 'acme-shoes', 'wk_acme_demo_local_only')`,
+    )
+    await pool.query(readFileSync(SEED_FILE_PATH, 'utf8'))
+    const keyResult = await pool.query(`SELECT widget_key FROM businesses WHERE slug = 'acme-shoes'`)
+
+    expect(keyResult.rows[0].widget_key).toMatch(/^wk_[0-9a-f]{32}$/)
   })
 
   it('returns 400 for a malformed widget key', async () => {
@@ -158,6 +182,7 @@ describe('GET /api/widget/session', () => {
       .set('Authorization', `Bearer ${sessionToken}`)
 
     expect(response.status).toBe(200)
+    expect(response.body.business).toEqual({ name: 'Read Session Shop' })
     expect(response.body.conversation).toEqual({
       id: conversation.id,
       status: 'open',

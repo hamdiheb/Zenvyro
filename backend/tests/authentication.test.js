@@ -141,6 +141,11 @@ describe('POST /api/authentication/sign-in', () => {
 
     expect(response.status).toBe(200)
     expect(response.body.user).toMatchObject({ email: 'ada@example.com', role: 'owner' })
+    expect(response.body.business).toEqual({
+      id: response.body.user.businessId,
+      name: VALID_SIGN_UP_BODY.businessName,
+      slug: expect.any(String),
+    })
     expect(extractSessionToken(response)).toEqual(expect.any(String))
     expect(await countSessionRows()).toBe(sessionRowsBefore + 1)
   })
@@ -182,6 +187,7 @@ describe('GET /api/authentication/me', () => {
     expect(response.status).toBe(200)
     expect(response.body.user).toMatchObject({ email: 'ada@example.com', role: 'owner' })
     expect(response.body.user).not.toHaveProperty('password_hash')
+    expect(response.body.business).toEqual(signUpResponse.body.business)
   })
 
   it('returns 401 when there is no cookie', async () => {

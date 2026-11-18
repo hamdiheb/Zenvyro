@@ -19,6 +19,7 @@ Website: **zenvyro.io** (domain planned, not yet registered)
 - [Tech stack](#tech-stack)
 - [Repository layout](#repository-layout)
 - [Getting started](#getting-started)
+- [What works today](#what-works-today)
 - [Project status](#project-status)
 - [Documentation](#documentation)
 
@@ -123,7 +124,7 @@ The agent reviews this suggestion and can approve it, edit it, or reject it. The
 | **Agent interface** | Three-pane inbox: filters (Mine, Unassigned, All), conversation thread, and reply box with verification suggestions. |
 | **Business dashboard** | KPIs, conversation volume, AI activity, ticket categories, and rule and knowledge management. |
 | **Express API** | REST endpoints for authentication, conversations, messages, rules, and knowledge articles. |
-| **Realtime gateway** | One room per conversation, so messages reach the widget and agent interface immediately. |
+| **Realtime gateway** | One room per conversation, so messages reach the widget and agent interface immediately, and one room per business for inbox-wide `conversation:created` and `conversation:updated` events. |
 | **Conversation router** | Decides whether a conversation is handled by AI or by a human, and handles escalation. |
 | **AI pipeline** | Intent classification, knowledge retrieval, rules check, reply generation, and a confidence gate. |
 | **Verification service** | Checks an agent's draft and returns strict JSON verdicts plus a suggested rewrite. |
@@ -213,7 +214,7 @@ The full schema is in [backend/db/schema.sql](backend/db/schema.sql). Main table
 
 | Layer | Technology |
 |---|---|
-| Frontend | React and Vite |
+| Frontend | React 19 and Vite, React Router, CSS modules with design tokens, `socket.io-client`, `lucide-react` icons |
 | Backend | Node.js and Express 5 |
 | Realtime | Socket.IO |
 | Database | PostgreSQL 16, accessed with `pg` using raw SQL |
@@ -237,12 +238,25 @@ saas/
 │   │   ├── services/        Business rules
 │   │   ├── repositories/    Parameterised SQL, one module per table
 │   │   ├── middleware/      Validation, session check, error handling
+│   │   ├── realtime/        Socket.IO gateway, rooms and event publisher
 │   │   ├── db/              Connection pool
 │   │   └── utils/           Shared helpers
 │   ├── db/                  schema.sql, seed.sql, migrations/
 │   ├── tests/               Jest and Supertest suites
 │   └── Dockerfile
-├── frontend/                React app: dashboard, agent, widget (in progress)
+├── frontend/                React + Vite app for every screen
+│   ├── src/
+│   │   ├── agent/           Agent inbox pages
+│   │   ├── auth/            Sign-in and sign-up pages
+│   │   ├── dashboard/       Dashboard (placeholder)
+│   │   ├── widget/          Customer chat widget page (runs inside the embed iframe)
+│   │   ├── demoStore/       Acme Shoes demo storefront that embeds the widget
+│   │   ├── components/      ui, layout, sections, inbox and widget components
+│   │   ├── api/             fetch client, one module per backend domain
+│   │   ├── hooks/           Session, conversations, messages, labels, realtime, widget chat
+│   │   └── styles/          Design tokens and global styles
+│   ├── public/              zenvyro-widget.js embed loader
+│   └── Design.md            Design plan
 ├── docker/postgres/init/    Creates the test database on first start
 ├── docker-compose.yml       PostgreSQL and backend services
 ├── .env.example             Documented environment variables
@@ -276,7 +290,18 @@ docker compose ps    # wait until the status is "healthy"
 
 Port 5432 must be free on your machine. Stop any local PostgreSQL first.
 
-### 3. Run the backend tests
+### 3. Create the development schema and seed data
+
+The migration runner (`npm run db:migrate` / `npm run db:seed`) is not written yet, so load the SQL files by hand. Run this once on a fresh database, from `saas/`:
+
+```bash
+docker compose exec -T postgres psql -U saad -d saad < backend/db/schema.sql
+docker compose exec -T postgres psql -U saad -d saad < backend/db/seed.sql
+```
+
+Use the `POSTGRES_USER` and `POSTGRES_DB` values from your `.env` if you changed them. `schema.sql` is not idempotent; `seed.sql` is. The seed creates the **Acme Shoes** demo business with the widget key `wk_ace5ace5ace5ace5ace5ace5ace5ace5`.
+
+### 4. Run the backend tests
 
 ```bash
 cd backend
@@ -286,16 +311,70 @@ npm test
 
 The tests run against the `saad_test` database and apply `backend/db/schema.sql` if the tables are missing.
 
-### 4. Start the API locally
+### 5. Start the API
 
 ```bash
 cd backend
 npm run dev
 ```
 
-The API listens on `http://localhost:4000`, with authentication endpoints under `/api/authentication`. See the [backend README](backend/README.md) for the full endpoint reference.
+The API and the Socket.IO server listen on `http://localhost:4000`. `CORS_ALLOWED_ORIGINS` in `.env` must include `http://localhost:5173` for the frontend. See the [backend README](backend/README.md) for the full endpoint and event reference.
 
-> The full `docker compose up` (backend and database together) is not usable yet. It depends on the database migration runner, which is planned for the next step in the roadmap.
+### 6. Start the frontend
+
+```bash
+cd frontend
+cp .env.example .env      # already holds the seeded Acme Shoes widget key
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`. Vite proxies `/api` and `/socket.io` to the backend, so the session cookie works in development. See the [frontend README](frontend/README.md) for routes, env vars and components.
+
+### 7. Try the full flow
+
+1. Sign up at `/sign-up`. This creates a new business and its owner, and opens the agent inbox.
+2. Open `/demo-store` in another browser (or a private window) and send a message from the chat widget.
+3. To see the widget's conversation in the inbox, sign in as staff of the business that owns the widget key. The demo store uses the Acme Shoes key, so either seed a staff user for Acme Shoes or set `VITE_DEMO_WIDGET_KEY` to the `widget_key` of the business you signed up with (`SELECT widget_key FROM businesses;`).
+4. Reply from the inbox. The reply appears in the widget in real time.
+
+> The full `docker compose up` (backend and database together) is not usable yet. Its backend command calls `src/db/databaseCommands.js`, the migration runner that is planned for the next step in the roadmap.
+
+---
+
+## What works today
+
+Human-to-human chat works end to end: a visitor writes from the embedded widget and a staff member answers from the agent inbox, in real time. AI features are not built yet.
+
+### Agent inbox (`/agent`)
+
+- Sign-up creates a business and its owner. Sign-in, sign-out and session restore use the HttpOnly session cookie. The business name from `GET /me` appears in the app shell.
+- Three-pane layout: conversation list, thread, and details.
+- List views **Mine**, **Unassigned** and **All**, a status filter, and cursor pagination. The view and filter stay in the URL.
+- Each row shows the customer, status, labels, the time of the newest message, and a **last-message preview** with an icon for team or AI replies.
+- Thread with message bubbles, day separators, older-page loading, and a reply composer. New messages arrive live through `message:created`.
+- Actions card: assign to me or unassign, change status, and add or create labels.
+- **Customer origin** card: country, flag, region, languages, and currencies (code and symbol) detected from the visitor's IP.
+
+### Customer widget
+
+- One-line embed: [frontend/public/zenvyro-widget.js](frontend/public/zenvyro-widget.js) adds an isolated iframe with a launcher button and a chat window (full screen on phones).
+- Anonymous visitor session from the public widget key. The 30-day token is kept in `localStorage`, so a reload resumes the same conversation.
+- The header shows the **business name returned by the widget session**. The embed's `data-business-name` is only a fallback.
+- Replies arrive live over a visitor socket. A dot on the launcher marks unread replies while the window is closed.
+- `/demo-store` is a fictional Acme Shoes storefront that embeds the widget, for demos and manual testing.
+
+### Backend
+
+- REST API for authentication, conversations, messages, assignment, labels, staff users, and the widget.
+- Socket.IO gateway with a room per conversation and a room per business. Staff sockets authenticate with the session cookie, visitor sockets with the widget token. A socket that carries a widget token is always treated as a visitor, even when the browser also has a staff cookie.
+- Visitor geo-origin from the IP address (ipwho.is), enriched with REST Countries, with graceful fallback.
+- Jest and Supertest suites against a real PostgreSQL test database.
+
+### Backend features the frontend does not use yet
+
+- **`GET /api/users`** (staff of the business). The inbox still offers only "Assign to me" and "Unassign"; an agent picker can use this.
+- **Per-business realtime events** `conversation:created` and `conversation:updated`. The inbox list still refetches every 20 seconds and on each `message:created`; it could update rows from these events instead.
 
 ---
 
@@ -306,15 +385,21 @@ The MVP is planned for three weeks. The schedule and feature list are in [ROADMA
 | Area | Status |
 |---|---|
 | Backend project setup (Express, Jest, ESLint) | Done |
-| PostgreSQL with Docker Compose, connection pool, full schema | Done (migration runner pending) |
+| PostgreSQL with Docker Compose, connection pool, full schema, demo seed | Done (migration runner pending) |
 | Authentication: sign-up, sign-in, me, sign-out | Done, with tests |
-| Conversations and messages API | Planned |
-| Realtime chat (Socket.IO) | Planned |
-| Embeddable customer widget | Planned |
-| Agent inbox | Planned |
+| Conversations and messages API | Done, with tests |
+| Assignment, labels and staff list API | Done, with tests |
+| Realtime chat (Socket.IO, conversation and business rooms) | Done, with tests |
+| Visitor geo-origin detection | Done, with tests |
+| Embeddable customer widget (API, loader, chat UI) | Done |
+| Agent inbox UI (list, thread, actions, origin card) | Done |
+| Sign-in and sign-up UI, app shell | Done |
+| Demo storefront | Done |
+| Agent picker and live inbox list from business-room events | Backend done, UI pending |
+| Business dashboard | Placeholder page |
 | Business rules and knowledge base | Planned |
 | AI autopilot and verification layer | Planned |
-| Frontend (dashboard, agent, widget) | Folder structure only |
+| Canned responses, internal notes, order history card | Planned |
 
 ---
 
@@ -322,5 +407,7 @@ The MVP is planned for three weeks. The schedule and feature list are in [ROADMA
 
 - [Product brief](Plan.md)
 - [Roadmap, data model, and architecture decisions](ROADMAP.md)
-- [Backend guide: setup, endpoints, and session design](backend/README.md)
-- [Environment variables](.env.example)
+- [Backend guide: setup, endpoints, realtime events, widget API, and session design](backend/README.md)
+- [Frontend guide: setup, routes, widget embedding, design tokens, and components](frontend/README.md)
+- [Frontend design plan](frontend/Design.md)
+- [Environment variables](.env.example) and [frontend environment variables](frontend/.env.example)

@@ -89,13 +89,15 @@ Widget keys are `wk_` followed by 32 lowercase hex characters. For local develop
 |---|---|---|---|---|
 | POST | `/sessions` | `widgetKey` in body | 201 `{ sessionToken, business, customer, conversation }` | Creates the visitor customer, a conversation and a session token. `name` (default "Website visitor") and `email` are optional. Unknown key: 401. |
 | GET | `/session` | `Authorization: Bearer <sessionToken>` | 200 `{ business, conversation, messages }` | The visitor's conversation and newest 50 messages, oldest first. Only visitor-safe fields. |
+| POST | `/messages` | `Authorization: Bearer <sessionToken>` | 201 `{ message }` | Body `{ body }`, 1 to 5000 characters. Saved as a `customer` message. A resolved conversation is reopened. |
 
 `business` is `{ name }`, the display name the widget shows in its header. No other business data is sent to visitors.
-| POST | `/messages` | `Authorization: Bearer <sessionToken>` | 201 `{ message }` | Body `{ body }`, 1 to 5000 characters. Saved as a `customer` message. A resolved conversation is reopened. |
 
 ### Realtime for visitors
 
 A visitor connects to Socket.IO with `io(url, { auth: { widgetSessionToken } })`. The server places the socket in its own room `conversation:<conversationId>` on connect, so it receives `message:created` for its conversation. Joining any other conversation gets `Conversation not found.`
+
+A socket that sends a `widgetSessionToken` is always authenticated as a visitor, even when the browser also sends a staff `zenvyro_session` cookie (for example, a staff member testing the widget on `/demo-store` in the same browser). It never joins the business room.
 
 ### Layout
 

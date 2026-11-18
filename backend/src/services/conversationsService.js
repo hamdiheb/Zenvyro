@@ -16,6 +16,11 @@ import {
   touchConversationLastMessageAt,
 } from '../repositories/conversationsRepository.js'
 import { insertMessage, findMessagesPageForConversation } from '../repositories/messagesRepository.js'
+import { findUserInBusiness } from '../repositories/usersRepository.js'
+import {
+  countLabelsInBusiness,
+  replaceConversationLabels,
+} from '../repositories/labelsRepository.js'
 
 const STAFF_SENDER_TYPE = 'agent'
 const CONVERSATION_NOT_FOUND_MESSAGE = 'Conversation not found.'
@@ -32,6 +37,7 @@ function toPublicConversation(conversationRow) {
     mode: conversationRow.mode,
     status: conversationRow.status,
     assignedAgentId: conversationRow.assigned_agent_id,
+    labels: conversationRow.labels,
     lastMessageAt: conversationRow.last_message_at,
     resolvedAt: conversationRow.resolved_at,
     createdAt: conversationRow.created_at,
@@ -141,16 +147,55 @@ export async function getConversationForBusiness({ businessId, conversationId })
   return toPublicConversation(conversationRow)
 }
 
-// Changes status and/or mode. Moving to resolved sets resolved_at; reopening clears it.
+// Changes status, mode and/or assignee. Moving to resolved sets resolved_at; reopening clears it.
+// An assignee must be a staff member of this business; null unassigns the conversation.
 export async function updateConversationForBusiness({ businessId, conversationId, changes }) {
+  const hasAssignedAgentChange = changes.assignedAgentId !== undefined
+  if (hasAssignedAgentChange && changes.assignedAgentId !== null) {
+    const assigneeRow = await findUserInBusiness(pool, { businessId, userId: changes.assignedAgentId })
+    if (!assigneeRow) {
+      throw new ApplicationError(400, 'assignedAgentId must be a staff member of this business.')
+    }
+  }
+
   const isUpdated = await updateConversationStatusAndMode(pool, {
     businessId,
     conversationId,
     status: changes.status,
     mode: changes.mode,
+    hasAssignedAgentChange,
+    assignedAgentId: changes.assignedAgentId ?? null,
   })
   if (!isUpdated) {
     throw new ApplicationError(404, CONVERSATION_NOT_FOUND_MESSAGE)
+  }
+  return getConversationForBusiness({ businessId, conversationId })
+}
+
+// Replaces the conversation's label set. Every label must belong to this business.
+export async function replaceConversationLabelsForBusiness({ businessId, conversationId, labelIds }) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+
+    const lockedConversationRow = await lockConversationForBusiness(client, { businessId, conversationId })
+    if (!lockedConversationRow) {
+      throw new ApplicationError(404, CONVERSATION_NOT_FOUND_MESSAGE)
+    }
+    if (labelIds.length > 0) {
+      const matchingLabelCount = await countLabelsInBusiness(client, { businessId, labelIds })
+      if (matchingLabelCount !== labelIds.length) {
+        throw new ApplicationError(400, 'Every label must belong to this business.')
+      }
+    }
+
+    await replaceConversationLabels(client, { conversationId, labelIds })
+    await client.query('COMMIT')
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
   }
   return getConversationForBusiness({ businessId, conversationId })
 }

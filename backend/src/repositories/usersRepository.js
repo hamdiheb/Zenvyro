@@ -19,3 +19,14 @@ export async function findUserWithPasswordByEmail(databaseExecutor, email) {
   )
   return result.rows[0] ?? null
 }
+
+// Confirms a staff id belongs to this business, so a conversation can only be assigned inside it.
+export async function findUserInBusiness(databaseExecutor, { businessId, userId }) {
+  const result = await databaseExecutor.query(
+    `SELECT id, business_id, name, email, role
+     FROM users
+     WHERE id = $1 AND business_id = $2`,
+    [userId, businessId],
+  )
+  return result.rows[0] ?? null
+}

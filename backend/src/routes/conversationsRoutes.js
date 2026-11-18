@@ -6,6 +6,7 @@ import { validateListConversationsMiddleware } from '../middleware/validateListC
 import { validateUpdateConversationMiddleware } from '../middleware/validateUpdateConversationMiddleware.js'
 import { validateListMessagesMiddleware } from '../middleware/validateListMessagesMiddleware.js'
 import { validatePostMessageMiddleware } from '../middleware/validatePostMessageMiddleware.js'
+import { validateSetConversationLabelsMiddleware } from '../middleware/validateSetConversationLabelsMiddleware.js'
 import {
   createConversation,
   listConversations,
@@ -13,6 +14,7 @@ import {
   updateConversation,
   listConversationMessages,
   postConversationMessage,
+  setConversationLabels,
 } from '../controllers/conversationsController.js'
 
 // Mounted at /api/conversations in app.js. Every endpoint needs a staff session.
@@ -34,6 +36,12 @@ conversationsRoutes.get(
   validateConversationIdMiddleware,
   validateListMessagesMiddleware,
   listConversationMessages,
+)
+conversationsRoutes.put(
+  '/:conversationId/labels',
+  validateConversationIdMiddleware,
+  validateSetConversationLabelsMiddleware,
+  setConversationLabels,
 )
 conversationsRoutes.post(
   '/:conversationId/messages',

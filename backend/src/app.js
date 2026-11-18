@@ -5,6 +5,7 @@ import { environmentConfig } from './config/environmentConfig.js'
 import { authenticationRoutes } from './routes/authenticationRoutes.js'
 import { conversationsRoutes } from './routes/conversationsRoutes.js'
 import { widgetRoutes } from './routes/widgetRoutes.js'
+import { labelsRoutes } from './routes/labelsRoutes.js'
 import { errorHandlerMiddleware } from './middleware/errorHandlerMiddleware.js'
 import { ApplicationError } from './utils/applicationError.js'
 
@@ -25,6 +26,7 @@ app.use(cookieParser())
 app.use('/api/authentication', authenticationRoutes)
 app.use('/api/conversations', conversationsRoutes)
 app.use('/api/widget', widgetRoutes)
+app.use('/api/labels', labelsRoutes)
 
 app.use((_request, _response, nextFunction) => {
   nextFunction(new ApplicationError(404, 'Route not found.'))

@@ -5,6 +5,7 @@ import {
   updateConversationForBusiness,
   listMessagesForConversation,
   postStaffMessageToConversation,
+  replaceConversationLabelsForBusiness,
 } from '../services/conversationsService.js'
 import { publishMessageCreatedToConversation } from '../realtime/conversationRealtimePublisher.js'
 
@@ -40,6 +41,15 @@ export async function updateConversation(request, response) {
     businessId: request.authenticatedUser.businessId,
     conversationId: request.params.conversationId,
     changes: request.validatedBody,
+  })
+  response.status(200).json({ conversation })
+}
+
+export async function setConversationLabels(request, response) {
+  const conversation = await replaceConversationLabelsForBusiness({
+    businessId: request.authenticatedUser.businessId,
+    conversationId: request.params.conversationId,
+    labelIds: request.validatedBody.labelIds,
   })
   response.status(200).json({ conversation })
 }

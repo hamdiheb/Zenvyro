@@ -1,8 +1,8 @@
 import { ApplicationError } from '../utils/applicationError.js'
-import { readBodyText } from '../utils/inputValidation.js'
+import { readBodyText, isValidUuid } from '../utils/inputValidation.js'
 import { CONVERSATION_STATUSES, CONVERSATION_MODES } from '../utils/conversationValues.js'
 
-// Accepts status and/or mode. At least one must be given; anything else is rejected.
+// Accepts status, mode and/or assignedAgentId (a staff id, or null to unassign). At least one must be given.
 export function validateUpdateConversationMiddleware(request, _response, nextFunction) {
   const requestBody = request.body ?? {}
   const changes = {}
@@ -23,8 +23,18 @@ export function validateUpdateConversationMiddleware(request, _response, nextFun
     changes.mode = modeText
   }
 
+  if (requestBody.assignedAgentId !== undefined) {
+    if (requestBody.assignedAgentId === null) {
+      changes.assignedAgentId = null
+    } else if (typeof requestBody.assignedAgentId === 'string' && isValidUuid(requestBody.assignedAgentId)) {
+      changes.assignedAgentId = requestBody.assignedAgentId
+    } else {
+      return nextFunction(new ApplicationError(400, 'assignedAgentId must be a staff id or null.'))
+    }
+  }
+
   if (Object.keys(changes).length === 0) {
-    return nextFunction(new ApplicationError(400, 'Give status or mode to change.'))
+    return nextFunction(new ApplicationError(400, 'Give status, mode or assignedAgentId to change.'))
   }
 
   request.validatedBody = changes

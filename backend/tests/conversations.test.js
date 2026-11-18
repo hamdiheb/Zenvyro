@@ -423,3 +423,80 @@ describe('tenant isolation', () => {
     expect(unchangedRow.rows[0].status).toBe('open')
   })
 })
+
+async function insertAgentUserRow(businessId, email) {
+  const result = await pool.query(
+    `INSERT INTO users (business_id, name, email, password_hash, role)
+     VALUES ($1, 'Agent Person', $2, 'not-used-for-sign-in', 'agent') RETURNING id`,
+    [businessId, email],
+  )
+  return result.rows[0].id
+}
+
+describe('assigning conversations with PATCH', () => {
+  it('assigns a conversation to a staff member of the same business and unassigns it with null', async () => {
+    const owner = await signUpBusinessOwner({ businessName: 'Assign Shop', email: 'owner@assign-shop.test' })
+    const agentUserId = await insertAgentUserRow(owner.businessId, 'agent@assign-shop.test')
+    const customerId = await insertCustomerRow(owner.businessId, { name: 'Assign Customer' })
+    const conversation = await createConversationForCustomer(owner.cookieHeader, customerId)
+
+    const assignResponse = await request(app)
+      .patch(`${CONVERSATIONS_PATH}/${conversation.id}`)
+      .set('Cookie', owner.cookieHeader)
+      .send({ assignedAgentId: agentUserId })
+    expect(assignResponse.status).toBe(200)
+    expect(assignResponse.body.conversation.assignedAgentId).toBe(agentUserId)
+
+    const unassignResponse = await request(app)
+      .patch(`${CONVERSATIONS_PATH}/${conversation.id}`)
+      .set('Cookie', owner.cookieHeader)
+      .send({ assignedAgentId: null })
+    expect(unassignResponse.status).toBe(200)
+    expect(unassignResponse.body.conversation.assignedAgentId).toBeNull()
+  })
+
+  it('leaves the assignee alone when only status changes', async () => {
+    const owner = await signUpBusinessOwner({ businessName: 'Keep Assignee Shop', email: 'owner@keep-assignee.test' })
+    const agentUserId = await insertAgentUserRow(owner.businessId, 'agent@keep-assignee.test')
+    const customerId = await insertCustomerRow(owner.businessId, { name: 'Keep Customer' })
+    const conversation = await createConversationForCustomer(owner.cookieHeader, customerId)
+    await request(app)
+      .patch(`${CONVERSATIONS_PATH}/${conversation.id}`)
+      .set('Cookie', owner.cookieHeader)
+      .send({ assignedAgentId: agentUserId })
+
+    const response = await request(app)
+      .patch(`${CONVERSATIONS_PATH}/${conversation.id}`)
+      .set('Cookie', owner.cookieHeader)
+      .send({ status: 'pending' })
+    expect(response.body.conversation.assignedAgentId).toBe(agentUserId)
+    expect(response.body.conversation.status).toBe('pending')
+  })
+
+  it('refuses an assignee from another business with 400', async () => {
+    const owner = await signUpBusinessOwner({ businessName: 'Local Shop', email: 'owner@local-shop.test' })
+    const otherOwner = await signUpBusinessOwner({ businessName: 'Remote Shop', email: 'owner@remote-shop.test' })
+    const outsiderUserId = await insertAgentUserRow(otherOwner.businessId, 'agent@remote-shop.test')
+    const customerId = await insertCustomerRow(owner.businessId, { name: 'Local Customer' })
+    const conversation = await createConversationForCustomer(owner.cookieHeader, customerId)
+
+    const response = await request(app)
+      .patch(`${CONVERSATIONS_PATH}/${conversation.id}`)
+      .set('Cookie', owner.cookieHeader)
+      .send({ assignedAgentId: outsiderUserId })
+    expect(response.status).toBe(400)
+    expect(response.body.error).toBe('assignedAgentId must be a staff member of this business.')
+  })
+
+  it('rejects a malformed assignedAgentId with 400', async () => {
+    const owner = await signUpBusinessOwner({ businessName: 'Malformed Assign Shop', email: 'owner@malformed-assign.test' })
+    const customerId = await insertCustomerRow(owner.businessId, { name: 'Malformed Customer' })
+    const conversation = await createConversationForCustomer(owner.cookieHeader, customerId)
+
+    const response = await request(app)
+      .patch(`${CONVERSATIONS_PATH}/${conversation.id}`)
+      .set('Cookie', owner.cookieHeader)
+      .send({ assignedAgentId: 'someone' })
+    expect(response.status).toBe(400)
+  })
+})

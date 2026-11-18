@@ -94,3 +94,27 @@ A visitor connects to Socket.IO with `io(url, { auth: { widgetSessionToken } })`
 - `middleware/requireWidgetSessionMiddleware.js`, `validateStartWidgetSessionMiddleware.js`
 - `repositories/widgetSessionsRepository.js`
 - `db/migrations/002_widget_sessions.sql` (also in `db/schema.sql`)
+
+## Agent inbox: assignment and labels
+
+### Assignment
+
+`PATCH /api/conversations/:conversationId` also accepts `assignedAgentId`. Send a staff user's id to assign, or `null` to unassign. Other fields in the same request are unchanged when `assignedAgentId` is absent. The assignee must be a staff member of the same business, otherwise 400. The inbox views are `GET /api/conversations?view=mine` (assigned to the signed-in user), `unassigned`, and `all`.
+
+### Labels
+
+Labels belong to a business. Names are unique per business (409 on a duplicate).
+
+| Method | Path | Success | Notes |
+|---|---|---|---|
+| GET | `/api/labels` | 200 `{ labels: [{ id, name, colorHex }] }` | Sorted by name. |
+| POST | `/api/labels` | 201 `{ label }` | Body `{ name, colorHex? }`. Name 1 to 40 characters. `colorHex` defaults to `#4a6cf7`. |
+| PUT | `/api/conversations/:conversationId/labels` | 200 `{ conversation }` | Body `{ labelIds: [...] }` replaces the whole label set. Up to 20 ids. Every label must belong to this business, otherwise 400. |
+
+Every conversation object (single and list) includes `labels: [{ id, name, colorHex }]`, read in the same query.
+
+### Layout
+
+- `routes/labelsRoutes.js`, `controllers/labelsController.js`, `services/labelsService.js`, `repositories/labelsRepository.js`
+- `middleware/validateCreateLabelMiddleware.js`, `validateSetConversationLabelsMiddleware.js`
+- `utils/labelValues.js`

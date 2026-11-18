@@ -16,7 +16,15 @@ const SELECT_CONVERSATION_WITH_CUSTOMER = `
          conversations.resolved_at,
          conversations.created_at,
          conversations.updated_at,
-         conversations.last_message_at::text AS sort_value
+         conversations.last_message_at::text AS sort_value,
+         COALESCE(
+           (SELECT json_agg(json_build_object('id', labels.id, 'name', labels.name, 'colorHex', labels.color_hex)
+                            ORDER BY labels.name)
+            FROM conversation_labels
+            JOIN labels ON labels.id = conversation_labels.label_id
+            WHERE conversation_labels.conversation_id = conversations.id),
+           '[]'::json
+         ) AS labels
   FROM conversations
   JOIN customers ON customers.id = conversations.customer_id`
 
@@ -98,9 +106,10 @@ export async function findConversationsPageForBusiness(
 }
 
 // Returns true when a row was changed. The CASE keeps resolved_at in step with the status.
+// assignedAgentId is only changed when hasAssignedAgentChange is true, so null can mean "unassign".
 export async function updateConversationStatusAndMode(
   databaseExecutor,
-  { businessId, conversationId, status, mode },
+  { businessId, conversationId, status, mode, hasAssignedAgentChange = false, assignedAgentId = null },
 ) {
   const result = await databaseExecutor.query(
     `UPDATE conversations
@@ -111,9 +120,10 @@ export async function updateConversationStatusAndMode(
            WHEN $3::text = 'resolved' THEN COALESCE(resolved_at, now())
            ELSE NULL
          END,
+         assigned_agent_id = CASE WHEN $5::boolean THEN $6::uuid ELSE assigned_agent_id END,
          updated_at = now()
      WHERE id = $1 AND business_id = $2`,
-    [conversationId, businessId, status ?? null, mode ?? null],
+    [conversationId, businessId, status ?? null, mode ?? null, hasAssignedAgentChange, assignedAgentId],
   )
   return result.rowCount > 0
 }

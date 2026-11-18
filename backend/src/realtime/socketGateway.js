@@ -5,6 +5,7 @@ import { pool } from '../db/databasePool.js'
 import { findLiveSessionByTokenHash } from '../repositories/sessionsRepository.js'
 import { findConversationForBusiness } from '../repositories/conversationsRepository.js'
 import { hashSessionToken } from '../services/sessionTokenService.js'
+import { findLiveWidgetSessionForToken } from '../services/widgetSessionService.js'
 import { isValidUuid } from '../utils/inputValidation.js'
 import {
   CONVERSATION_JOIN_EVENT,
@@ -15,6 +16,7 @@ import { buildConversationRoomName } from './conversationRoomNames.js'
 const NOT_SIGNED_IN_MESSAGE = 'You must be signed in.'
 const SESSION_ENDED_MESSAGE = 'Your session has ended. Please sign in again.'
 const SESSION_CHECK_FAILED_MESSAGE = 'Could not verify your session.'
+const WIDGET_SESSION_ENDED_MESSAGE = 'Your chat session has ended. Start a new chat.'
 const CONVERSATION_NOT_FOUND_MESSAGE = 'Conversation not found.'
 const JOIN_FAILED_MESSAGE = 'Could not join the conversation.'
 
@@ -29,8 +31,10 @@ function acknowledgeRequest(acknowledgeCallback, result) {
 // A conversation from another business gets the same "not found" answer as a missing one.
 async function joinConversationRoom(socket, joinRequest, acknowledgeCallback) {
   try {
+    // Visitors are placed in their own room on connect and may not join others, so they get the
+    // same "not found" answer as any other conversation they cannot see.
     const conversationId = joinRequest?.conversationId
-    if (!isValidUuid(conversationId)) {
+    if (!socket.data.authenticatedUser || !isValidUuid(conversationId)) {
       return acknowledgeRequest(acknowledgeCallback, { isSuccessful: false, error: CONVERSATION_NOT_FOUND_MESSAGE })
     }
 
@@ -66,7 +70,7 @@ async function authenticateSocketConnection(socket, nextFunction) {
   try {
     const sessionToken = socket.request.cookies?.[environmentConfig.sessionCookieName]
     if (!sessionToken) {
-      return nextFunction(new Error(NOT_SIGNED_IN_MESSAGE))
+      return authenticateWidgetVisitor(socket, nextFunction)
     }
 
     const sessionRow = await findLiveSessionByTokenHash(pool, hashSessionToken(sessionToken))
@@ -88,6 +92,23 @@ async function authenticateSocketConnection(socket, nextFunction) {
   }
 }
 
+// Website visitors have no staff cookie. They send their widget session token in the handshake auth
+// object (socket.io-client: io(url, { auth: { widgetSessionToken } })).
+async function authenticateWidgetVisitor(socket, nextFunction) {
+  const widgetSessionToken = socket.handshake.auth?.widgetSessionToken
+  if (typeof widgetSessionToken !== 'string' || widgetSessionToken.length === 0) {
+    return nextFunction(new Error(NOT_SIGNED_IN_MESSAGE))
+  }
+
+  const widgetSession = await findLiveWidgetSessionForToken(widgetSessionToken)
+  if (!widgetSession) {
+    return nextFunction(new Error(WIDGET_SESSION_ENDED_MESSAGE))
+  }
+
+  socket.data.widgetSession = widgetSession
+  return nextFunction()
+}
+
 // Attaches Socket.IO to the HTTP server. Only signed-in staff sessions can connect.
 export function createSocketGateway(httpServer) {
   const socketServer = new SocketIoServer(httpServer, {
@@ -102,6 +123,9 @@ export function createSocketGateway(httpServer) {
   socketServer.use(authenticateSocketConnection)
 
   socketServer.on('connection', (socket) => {
+    if (socket.data.widgetSession) {
+      socket.join(buildConversationRoomName(socket.data.widgetSession.conversation_id))
+    }
     socket.on(CONVERSATION_JOIN_EVENT, (joinRequest, acknowledgeCallback) =>
       joinConversationRoom(socket, joinRequest, acknowledgeCallback),
     )

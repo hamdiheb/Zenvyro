@@ -70,3 +70,27 @@ Socket.IO runs on the same HTTP server as Express (`src/server.js`). Path: the S
 - `realtime/socketGateway.js`: authentication, join and leave handlers.
 - `realtime/conversationRealtimePublisher.js`: sends `message:created` to a room.
 - `realtime/realtimeEventNames.js`, `realtime/conversationRoomNames.js`: shared names.
+
+## Website widget (customer chat)
+
+Base path: `/api/widget`. Visitors are anonymous customers, not staff. They never use the staff cookie. The widget key identifies the business and is public (it is in the embed code). Visitor tokens are random and stored only as SHA-256 hashes in `widget_sessions`. Sessions last 30 days.
+
+Widget routes accept any browser origin, because they use a bearer token and no cookie.
+
+| Method | Path | Auth | Success | Notes |
+|---|---|---|---|---|
+| POST | `/sessions` | `widgetKey` in body | 201 `{ sessionToken, customer, conversation }` | Creates the visitor customer, a conversation and a session token. `name` (default "Website visitor") and `email` are optional. Unknown key: 401. |
+| GET | `/session` | `Authorization: Bearer <sessionToken>` | 200 `{ conversation, messages }` | The visitor's conversation and newest 50 messages, oldest first. Only visitor-safe fields. |
+| POST | `/messages` | `Authorization: Bearer <sessionToken>` | 201 `{ message }` | Body `{ body }`, 1 to 5000 characters. Saved as a `customer` message. A resolved conversation is reopened. |
+
+### Realtime for visitors
+
+A visitor connects to Socket.IO with `io(url, { auth: { widgetSessionToken } })`. The server places the socket in its own room `conversation:<conversationId>` on connect, so it receives `message:created` for its conversation. Joining any other conversation gets `Conversation not found.`
+
+### Layout
+
+- `routes/widgetRoutes.js`, `controllers/widgetController.js`
+- `services/widgetSessionService.js`: start session, read conversation, post visitor message, token lookup
+- `middleware/requireWidgetSessionMiddleware.js`, `validateStartWidgetSessionMiddleware.js`
+- `repositories/widgetSessionsRepository.js`
+- `db/migrations/002_widget_sessions.sql` (also in `db/schema.sql`)

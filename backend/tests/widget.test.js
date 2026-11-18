@@ -210,3 +210,75 @@ describe('GET /api/widget/session', () => {
     expect(response.status).toBe(401)
   })
 })
+
+describe('POST /api/widget/messages', () => {
+  it('saves a visitor message as a customer message that staff can read', async () => {
+    const { staffCookieHeader, widgetKey } = await signUpStaffCookieAndWidgetKey({
+      businessName: 'Visitor Message Shop',
+      email: 'owner@visitor-message-shop.test',
+    })
+    const startResponse = await request(app).post(WIDGET_SESSIONS_PATH).send({ widgetKey })
+    const { sessionToken, conversation } = startResponse.body
+
+    const postResponse = await request(app)
+      .post('/api/widget/messages')
+      .set('Authorization', `Bearer ${sessionToken}`)
+      .send({ body: '  Where is my order?  ' })
+
+    expect(postResponse.status).toBe(201)
+    expect(postResponse.body.message.senderType).toBe('customer')
+    expect(postResponse.body.message.body).toBe('Where is my order?')
+    expect(postResponse.body.message.senderId).toBeUndefined()
+
+    const staffListResponse = await request(app)
+      .get(`/api/conversations/${conversation.id}/messages`)
+      .set('Cookie', staffCookieHeader)
+    expect(staffListResponse.body.messages.map((message) => message.body)).toEqual(['Where is my order?'])
+    expect(staffListResponse.body.messages[0].senderType).toBe('customer')
+  })
+
+  it('reopens a resolved conversation when the visitor writes again', async () => {
+    const { staffCookieHeader, widgetKey } = await signUpStaffCookieAndWidgetKey({
+      businessName: 'Reopen Shop',
+      email: 'owner@reopen-shop.test',
+    })
+    const startResponse = await request(app).post(WIDGET_SESSIONS_PATH).send({ widgetKey })
+    const { sessionToken, conversation } = startResponse.body
+
+    await request(app)
+      .patch(`/api/conversations/${conversation.id}`)
+      .set('Cookie', staffCookieHeader)
+      .send({ status: 'resolved' })
+
+    const postResponse = await request(app)
+      .post('/api/widget/messages')
+      .set('Authorization', `Bearer ${sessionToken}`)
+      .send({ body: 'Still need help' })
+    expect(postResponse.status).toBe(201)
+
+    const conversationResponse = await request(app)
+      .get(`/api/conversations/${conversation.id}`)
+      .set('Cookie', staffCookieHeader)
+    expect(conversationResponse.body.conversation.status).toBe('open')
+    expect(conversationResponse.body.conversation.resolvedAt).toBeNull()
+  })
+
+  it('rejects an empty message body', async () => {
+    const { widgetKey } = await signUpStaffCookieAndWidgetKey({
+      businessName: 'Empty Body Shop',
+      email: 'owner@empty-body-shop.test',
+    })
+    const startResponse = await request(app).post(WIDGET_SESSIONS_PATH).send({ widgetKey })
+
+    const response = await request(app)
+      .post('/api/widget/messages')
+      .set('Authorization', `Bearer ${startResponse.body.sessionToken}`)
+      .send({ body: '   ' })
+    expect(response.status).toBe(400)
+  })
+
+  it('returns 401 without a bearer token', async () => {
+    const response = await request(app).post('/api/widget/messages').send({ body: 'Hello' })
+    expect(response.status).toBe(401)
+  })
+})

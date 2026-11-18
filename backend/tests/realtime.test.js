@@ -213,3 +213,106 @@ describe('message broadcast to a conversation room', () => {
     bystanderSocketClient.close()
   })
 })
+
+// Connects as a website visitor. The widget session token goes in the handshake auth object, not a cookie.
+function connectVisitorSocketClient(serverPort, widgetSessionToken) {
+  const socketClient = createSocketClient(`http://localhost:${serverPort}`, {
+    transports: ['websocket'],
+    forceNew: true,
+    reconnection: false,
+    auth: { widgetSessionToken },
+  })
+  return new Promise((resolve, reject) => {
+    socketClient.once('connect', () => resolve(socketClient))
+    socketClient.once('connect_error', (error) => {
+      socketClient.close()
+      reject(error)
+    })
+  })
+}
+
+async function startVisitorSession(widgetKey) {
+  const response = await request(app).post('/api/widget/sessions').send({ widgetKey })
+  return response.body
+}
+
+async function widgetKeyForBusiness(businessId) {
+  const keyResult = await pool.query('SELECT widget_key FROM businesses WHERE id = $1', [businessId])
+  return keyResult.rows[0].widget_key
+}
+
+describe('website visitor sockets', () => {
+  it('rejects a visitor connection with an unknown widget session token', async () => {
+    await expect(connectVisitorSocketClient(serverPort, 'not-a-real-token')).rejects.toThrow(
+      'Your chat session has ended. Start a new chat.',
+    )
+  })
+
+  it('places the visitor in their own conversation room and delivers agent replies live', async () => {
+    const { cookieHeader: staffCookieHeader, businessId } = await signUpBusinessOwner({
+      businessName: 'Visitor Socket Shop',
+      email: 'owner@visitor-socket-shop.test',
+    })
+    const widgetKey = await widgetKeyForBusiness(businessId)
+    const { sessionToken, conversation } = await startVisitorSession(widgetKey)
+
+    const visitorSocketClient = await connectVisitorSocketClient(serverPort, sessionToken)
+    const replyReceivedPromise = new Promise((resolve) => {
+      visitorSocketClient.once(MESSAGE_CREATED_EVENT, resolve)
+    })
+
+    const replyResponse = await request(app)
+      .post(`/api/conversations/${conversation.id}/messages`)
+      .set('Cookie', staffCookieHeader)
+      .send({ body: 'Thanks for waiting, here is your answer' })
+    expect(replyResponse.status).toBe(201)
+
+    const receivedEvent = await replyReceivedPromise
+    expect(receivedEvent.conversationId).toBe(conversation.id)
+    expect(receivedEvent.message.body).toBe('Thanks for waiting, here is your answer')
+    visitorSocketClient.close()
+  })
+
+  it('refuses a visitor who asks to join another conversation', async () => {
+    const { businessId } = await signUpBusinessOwner({
+      businessName: 'Nosy Visitor Shop',
+      email: 'owner@nosy-visitor-shop.test',
+    })
+    const widgetKey = await widgetKeyForBusiness(businessId)
+    const { sessionToken } = await startVisitorSession(widgetKey)
+    const otherConversationId = await insertConversationForBusiness(businessId, 'Someone Else')
+
+    const visitorSocketClient = await connectVisitorSocketClient(serverPort, sessionToken)
+    const acknowledgement = await emitWithAcknowledgement(visitorSocketClient, CONVERSATION_JOIN_EVENT, {
+      conversationId: otherConversationId,
+    })
+    expect(acknowledgement).toEqual({ isSuccessful: false, error: 'Conversation not found.' })
+    visitorSocketClient.close()
+  })
+
+  it('delivers a visitor message to the staff socket that joined the conversation', async () => {
+    const { cookieHeader: staffCookieHeader, businessId } = await signUpBusinessOwner({
+      businessName: 'Staff Hears Shop',
+      email: 'owner@staff-hears-shop.test',
+    })
+    const widgetKey = await widgetKeyForBusiness(businessId)
+    const { sessionToken, conversation } = await startVisitorSession(widgetKey)
+
+    const staffSocketClient = await connectSocketClient(serverPort, staffCookieHeader)
+    await emitWithAcknowledgement(staffSocketClient, CONVERSATION_JOIN_EVENT, { conversationId: conversation.id })
+    const messageReceivedPromise = new Promise((resolve) => {
+      staffSocketClient.once(MESSAGE_CREATED_EVENT, resolve)
+    })
+
+    const visitorPostResponse = await request(app)
+      .post('/api/widget/messages')
+      .set('Authorization', `Bearer ${sessionToken}`)
+      .send({ body: 'Hello, I need help' })
+    expect(visitorPostResponse.status).toBe(201)
+
+    const receivedEvent = await messageReceivedPromise
+    expect(receivedEvent.message.senderType).toBe('customer')
+    expect(receivedEvent.message.body).toBe('Hello, I need help')
+    staffSocketClient.close()
+  })
+})

@@ -6,8 +6,12 @@ import { insertCustomer } from '../repositories/customersRepository.js'
 import {
   insertConversation,
   findConversationForBusiness,
+  lockConversationForBusiness,
+  updateConversationStatusAndMode,
+  touchConversationLastMessageAt,
 } from '../repositories/conversationsRepository.js'
-import { findMessagesPageForConversation } from '../repositories/messagesRepository.js'
+import { insertMessage, findMessagesPageForConversation } from '../repositories/messagesRepository.js'
+import { RESOLVED_CONVERSATION_STATUS } from '../utils/conversationValues.js'
 import {
   insertWidgetSession,
   findLiveWidgetSessionByTokenHash,
@@ -16,6 +20,7 @@ import { generateSessionToken, hashSessionToken } from './sessionTokenService.js
 
 const INVALID_WIDGET_KEY_MESSAGE = 'The widget key is not valid.'
 const DEFAULT_VISITOR_NAME = 'Website visitor'
+const OPEN_CONVERSATION_STATUS = 'open'
 
 // Creates the visitor (customer), their conversation and a widget session token in one transaction.
 // The widget key identifies the business. It is public, so it grants only this one-visitor session.
@@ -96,5 +101,51 @@ export async function getWidgetConversationWithRecentMessages({ widgetSession })
       body: messageRow.body,
       createdAt: messageRow.created_at,
     })),
+  }
+}
+
+const VISITOR_SENDER_TYPE = 'customer'
+
+// Saves a visitor message. A visitor who writes to a resolved conversation reopens it, so agents see
+// the new message. The conversation row is locked so this cannot race with a resolve.
+export async function postVisitorMessageToWidgetConversation({ widgetSession, body }) {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+
+    const lockedConversationRow = await lockConversationForBusiness(client, {
+      businessId: widgetSession.business_id,
+      conversationId: widgetSession.conversation_id,
+    })
+    if (lockedConversationRow.status === RESOLVED_CONVERSATION_STATUS) {
+      await updateConversationStatusAndMode(client, {
+        businessId: widgetSession.business_id,
+        conversationId: widgetSession.conversation_id,
+        status: OPEN_CONVERSATION_STATUS,
+        mode: null,
+      })
+    }
+
+    const messageRow = await insertMessage(client, {
+      conversationId: widgetSession.conversation_id,
+      senderType: VISITOR_SENDER_TYPE,
+      senderId: widgetSession.customer_id,
+      body,
+    })
+    await touchConversationLastMessageAt(client, { conversationId: widgetSession.conversation_id })
+
+    await client.query('COMMIT')
+    return {
+      id: messageRow.id,
+      conversationId: messageRow.conversation_id,
+      senderType: messageRow.sender_type,
+      body: messageRow.body,
+      createdAt: messageRow.created_at,
+    }
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
   }
 }

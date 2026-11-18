@@ -6,6 +6,7 @@ import {
   listMessagesForConversation,
   postStaffMessageToConversation,
 } from '../services/conversationsService.js'
+import { publishMessageCreatedToConversation } from '../realtime/conversationRealtimePublisher.js'
 
 // Every handler scopes to the signed-in user's business. The conversation id comes from the URL.
 export async function createConversation(request, response) {
@@ -58,6 +59,11 @@ export async function postConversationMessage(request, response) {
     staffUserId: request.authenticatedUser.id,
     conversationId: request.params.conversationId,
     body: request.validatedBody.body,
+  })
+  // The message is committed at this point, so live clients in the room can receive it.
+  publishMessageCreatedToConversation(request.app.get('socketServer'), {
+    conversationId: message.conversationId,
+    message,
   })
   response.status(201).json({ message })
 }

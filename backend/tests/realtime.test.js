@@ -8,6 +8,7 @@ import { pool } from '../src/db/databasePool.js'
 import {
   CONVERSATION_JOIN_EVENT,
   CONVERSATION_LEAVE_EVENT,
+  MESSAGE_CREATED_EVENT,
 } from '../src/realtime/realtimeEventNames.js'
 import {
   prepareTestDatabase,
@@ -56,7 +57,8 @@ let serverPort
 beforeAll(async () => {
   await prepareTestDatabase()
   httpServer = createServer(app)
-  createSocketGateway(httpServer)
+  // The same wiring as server.js: controllers find the gateway through app.get('socketServer').
+  app.set('socketServer', createSocketGateway(httpServer))
   await new Promise((resolve) => httpServer.listen(0, resolve))
   serverPort = httpServer.address().port
 })
@@ -169,5 +171,45 @@ describe('conversation rooms', () => {
     const acknowledgement = await emitWithAcknowledgement(socketClient, CONVERSATION_LEAVE_EVENT, { conversationId })
     expect(acknowledgement).toEqual({ isSuccessful: true, conversationId })
     socketClient.close()
+  })
+})
+
+describe('message broadcast to a conversation room', () => {
+  it('delivers a staff message to sockets in the room and not to other businesses', async () => {
+    const { cookieHeader: staffCookieHeader, businessId } = await signUpBusinessOwner({
+      businessName: 'Broadcast Shop',
+      email: 'owner@broadcast-shop.test',
+    })
+    const conversationId = await insertConversationForBusiness(businessId, 'Broadcast Customer')
+    const { cookieHeader: otherCookieHeader } = await signUpBusinessOwner({
+      businessName: 'Bystander Shop',
+      email: 'owner@bystander-shop.test',
+    })
+
+    const joinedSocketClient = await connectSocketClient(serverPort, staffCookieHeader)
+    await emitWithAcknowledgement(joinedSocketClient, CONVERSATION_JOIN_EVENT, { conversationId })
+    const bystanderSocketClient = await connectSocketClient(serverPort, otherCookieHeader)
+    const receivedByBystander = []
+    bystanderSocketClient.on(MESSAGE_CREATED_EVENT, (event) => receivedByBystander.push(event))
+
+    const receivedMessagePromise = new Promise((resolve) => {
+      joinedSocketClient.once(MESSAGE_CREATED_EVENT, resolve)
+    })
+    const postResponse = await request(app)
+      .post(`/api/conversations/${conversationId}/messages`)
+      .set('Cookie', staffCookieHeader)
+      .send({ body: 'Hello from the agent' })
+    expect(postResponse.status).toBe(201)
+
+    const receivedEvent = await receivedMessagePromise
+    expect(receivedEvent.conversationId).toBe(conversationId)
+    expect(receivedEvent.message).toEqual(postResponse.body.message)
+    expect(receivedEvent.message.body).toBe('Hello from the agent')
+
+    // The other business's socket is connected but never joined this room, so it must receive nothing.
+    expect(receivedByBystander).toEqual([])
+
+    joinedSocketClient.close()
+    bystanderSocketClient.close()
   })
 })

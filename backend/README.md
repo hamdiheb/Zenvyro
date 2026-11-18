@@ -43,3 +43,30 @@ Errors are JSON: `{ "error": "message" }`. Expected failures return 400 (validat
 - `services/authenticationService.js`: sign-up, sign-in and sign-out rules.
 - `services/sessionTokenService.js`: token generation and hashing.
 - `repositories/*Repository.js`: parameterized SQL, one module per table.
+
+## Realtime (Socket.IO)
+
+Socket.IO runs on the same HTTP server as Express (`src/server.js`). Path: the Socket.IO default (`/socket.io`). Same CORS origins as the REST API, with credentials.
+
+### Connecting
+
+- The browser sends the `zenvyro_session` cookie during the handshake. Each connection is checked against the `sessions` table, the same way REST requests are.
+- No cookie, an unknown session, or an expired session fails the connection with an error message (`You must be signed in.` or `Your session has ended. Please sign in again.`).
+
+### Events
+
+| Direction | Event | Payload | Acknowledgement |
+|---|---|---|---|
+| client to server | `conversation:join` | `{ conversationId }` | `{ isSuccessful: true, conversationId }`, or `{ isSuccessful: false, error }` |
+| client to server | `conversation:leave` | `{ conversationId }` | Same shape as join |
+| server to client | `message:created` | `{ conversationId, message }` | none, sent after the message is saved |
+
+- Each conversation has one room, named `conversation:<conversationId>`.
+- A socket can join only a conversation that belongs to its own business. Another business's conversation, a missing one and a malformed id all return `Conversation not found.`
+- `message:created` is sent when `POST /api/conversations/:conversationId/messages` saves a message. Only sockets that joined the room receive it.
+
+### Layout
+
+- `realtime/socketGateway.js`: authentication, join and leave handlers.
+- `realtime/conversationRealtimePublisher.js`: sends `message:created` to a room.
+- `realtime/realtimeEventNames.js`, `realtime/conversationRoomNames.js`: shared names.

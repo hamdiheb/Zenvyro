@@ -8,6 +8,16 @@ function joinList(listValues) {
   return Array.isArray(listValues) && listValues.length > 0 ? listValues.join(', ') : '—'
 }
 
+// The API sends currencies as [{ code, name, symbol }], shown as "EUR (€)".
+function formatCurrencies(currencies) {
+  if (!Array.isArray(currencies)) {
+    return '—'
+  }
+  return joinList(
+    currencies.map((currency) => (currency.symbol ? `${currency.code} (${currency.symbol})` : currency.code)),
+  )
+}
+
 // Where the visitor is writing from (roadmap item 7b). Private IPs and failed lookups are not
 // "detected", so the card says so instead of guessing.
 export function CustomerOriginCard({ origin }) {
@@ -33,7 +43,7 @@ export function CustomerOriginCard({ origin }) {
             <dt>Languages</dt>
             <dd>{joinList(origin.languages)}</dd>
             <dt>Currencies</dt>
-            <dd>{joinList(origin.currencies)}</dd>
+            <dd>{formatCurrencies(origin.currencies)}</dd>
             <dt>Detected</dt>
             <dd>{origin.detectedAt ? formatFullDateTime(origin.detectedAt) : '—'}</dd>
           </dl>

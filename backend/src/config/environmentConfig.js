@@ -23,4 +23,8 @@ export const environmentConfig = Object.freeze({
   // Widget visitors keep their chat for longer than staff sessions, so they can come back to it.
   widgetSessionDurationSeconds: 30 * 24 * 60 * 60,
   isCookieSecure: nodeEnvironment === 'production',
+  // Number of reverse proxies in front of the API. Decides which address counts as the client IP.
+  trustProxyHopCount: Number(process.env.TRUST_PROXY_HOP_COUNT ?? 0),
+  geoIpLookupBaseUrl: (process.env.GEO_IP_LOOKUP_BASE_URL ?? '').replace(/\/+$/, ''),
+  restCountriesBaseUrl: (process.env.REST_COUNTRIES_BASE_URL ?? '').replace(/\/+$/, ''),
 })

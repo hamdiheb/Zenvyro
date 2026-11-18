@@ -11,6 +11,7 @@ export async function startWidgetSession(request, response) {
     widgetKey: request.validatedBody.widgetKey,
     visitorName: request.validatedBody.visitorName,
     visitorEmail: request.validatedBody.visitorEmail,
+    ipAddress: request.ip,
   })
   response.status(201).json(widgetSession)
 }

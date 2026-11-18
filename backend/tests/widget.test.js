@@ -1,5 +1,6 @@
 import request from 'supertest'
 import { createHash } from 'node:crypto'
+import { jest } from '@jest/globals'
 import { app } from '../src/app.js'
 import { pool } from '../src/db/databasePool.js'
 import {
@@ -280,5 +281,97 @@ describe('POST /api/widget/messages', () => {
   it('returns 401 without a bearer token', async () => {
     const response = await request(app).post('/api/widget/messages').send({ body: 'Hello' })
     expect(response.status).toBe(401)
+  })
+})
+
+describe('visitor origin on the conversation', () => {
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('records private_address for a visitor on a loopback address, with no lookup', async () => {
+    const { staffCookieHeader, widgetKey } = await signUpStaffCookieAndWidgetKey({
+      businessName: 'Local Visitor Shop',
+      email: 'owner@local-visitor-shop.test',
+    })
+    const fetchSpy = jest.spyOn(globalThis, 'fetch')
+
+    const startResponse = await request(app).post(WIDGET_SESSIONS_PATH).send({ widgetKey })
+    expect(startResponse.status).toBe(201)
+
+    const conversationResponse = await request(app)
+      .get(`/api/conversations/${startResponse.body.conversation.id}`)
+      .set('Cookie', staffCookieHeader)
+    expect(conversationResponse.body.conversation.origin).toMatchObject({
+      status: 'private_address',
+      countryCode: null,
+      countryName: null,
+      languages: [],
+      currencies: [],
+    })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('stores the detected country and its REST Countries details for a public visitor', async () => {
+    const { staffCookieHeader, widgetKey } = await signUpStaffCookieAndWidgetKey({
+      businessName: 'Public Visitor Shop',
+      email: 'owner@public-visitor-shop.test',
+    })
+    jest.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).startsWith('https://geo-lookup.test/')) {
+        return new Response(JSON.stringify({ success: true, country_code: 'FR' }), { status: 200 })
+      }
+      return new Response(
+        JSON.stringify([
+          {
+            name: { common: 'France' },
+            region: 'Europe',
+            flags: { png: 'https://flagcdn.test/fr.png' },
+            languages: { fra: 'French' },
+            currencies: { EUR: { name: 'Euro', symbol: '€' } },
+          },
+        ]),
+        { status: 200 },
+      )
+    })
+
+    const startResponse = await request(app)
+      .post(WIDGET_SESSIONS_PATH)
+      .set('X-Forwarded-For', '203.0.113.7')
+      .send({ widgetKey })
+    expect(startResponse.status).toBe(201)
+
+    const conversationResponse = await request(app)
+      .get(`/api/conversations/${startResponse.body.conversation.id}`)
+      .set('Cookie', staffCookieHeader)
+    expect(conversationResponse.body.conversation.origin).toMatchObject({
+      status: 'detected',
+      countryCode: 'FR',
+      countryName: 'France',
+      region: 'Europe',
+      flagImageUrl: 'https://flagcdn.test/fr.png',
+      languages: ['French'],
+      currencies: [{ code: 'EUR', name: 'Euro', symbol: '€' }],
+    })
+  })
+
+  it('still starts the chat when the geo lookup is down, and records unavailable', async () => {
+    const { staffCookieHeader, widgetKey } = await signUpStaffCookieAndWidgetKey({
+      businessName: 'Geo Down Shop',
+      email: 'owner@geo-down-shop.test',
+    })
+    jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network unreachable'))
+    jest.spyOn(console, 'error').mockImplementation(() => {})
+
+    const startResponse = await request(app)
+      .post(WIDGET_SESSIONS_PATH)
+      .set('X-Forwarded-For', '203.0.113.7')
+      .send({ widgetKey })
+    expect(startResponse.status).toBe(201)
+
+    const conversationResponse = await request(app)
+      .get(`/api/conversations/${startResponse.body.conversation.id}`)
+      .set('Cookie', staffCookieHeader)
+    expect(conversationResponse.body.conversation.origin.status).toBe('unavailable')
   })
 })

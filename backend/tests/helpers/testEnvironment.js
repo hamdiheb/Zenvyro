@@ -9,3 +9,8 @@ if (!process.env.TEST_DATABASE_URL) {
 process.env.NODE_ENV = 'test'
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL
 process.env.CORS_ALLOWED_ORIGINS = 'http://localhost:5173'
+// Geo lookups must never reach the real internet from tests. Tests that need a lookup mock fetch instead.
+process.env.GEO_IP_LOOKUP_BASE_URL = 'https://geo-lookup.test'
+process.env.REST_COUNTRIES_BASE_URL = 'https://rest-countries.test/v3.1'
+// One trusted proxy hop, so a test can give the visitor a public address with X-Forwarded-For.
+process.env.TRUST_PROXY_HOP_COUNT = '1'

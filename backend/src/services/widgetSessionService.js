@@ -6,12 +6,14 @@ import { insertCustomer } from '../repositories/customersRepository.js'
 import {
   insertConversation,
   findConversationForBusiness,
+  updateConversationOrigin,
   lockConversationForBusiness,
   updateConversationStatusAndMode,
   touchConversationLastMessageAt,
 } from '../repositories/conversationsRepository.js'
 import { insertMessage, findMessagesPageForConversation } from '../repositories/messagesRepository.js'
 import { RESOLVED_CONVERSATION_STATUS } from '../utils/conversationValues.js'
+import { detectOriginForIpAddress } from './geoOriginService.js'
 import {
   insertWidgetSession,
   findLiveWidgetSessionByTokenHash,
@@ -24,11 +26,13 @@ const OPEN_CONVERSATION_STATUS = 'open'
 
 // Creates the visitor (customer), their conversation and a widget session token in one transaction.
 // The widget key identifies the business. It is public, so it grants only this one-visitor session.
-export async function startWidgetSessionForWidgetKey({ widgetKey, visitorName, visitorEmail }) {
+// The visitor's origin is looked up before the transaction opens, so no database lock waits on the network.
+export async function startWidgetSessionForWidgetKey({ widgetKey, visitorName, visitorEmail, ipAddress }) {
   const businessRow = await findBusinessByWidgetKey(pool, { widgetKey })
   if (!businessRow) {
     throw new ApplicationError(401, INVALID_WIDGET_KEY_MESSAGE)
   }
+  const visitorOrigin = await detectOriginForIpAddress(ipAddress)
 
   const client = await pool.connect()
   try {
@@ -44,6 +48,7 @@ export async function startWidgetSessionForWidgetKey({ widgetKey, visitorName, v
       businessId: businessRow.id,
       customerId: customerRow.id,
     })
+    await updateConversationOrigin(client, { conversationId: conversationRow.id, origin: visitorOrigin })
 
     const sessionToken = generateSessionToken()
     await insertWidgetSession(client, {

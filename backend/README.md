@@ -118,3 +118,23 @@ Every conversation object (single and list) includes `labels: [{ id, name, color
 - `routes/labelsRoutes.js`, `controllers/labelsController.js`, `services/labelsService.js`, `repositories/labelsRepository.js`
 - `middleware/validateCreateLabelMiddleware.js`, `validateSetConversationLabelsMiddleware.js`
 - `utils/labelValues.js`
+
+## Visitor origin (geo detection)
+
+When a website visitor starts a chat (`POST /api/widget/sessions`), the API works out where they are from their IP address. The result is stored once on the conversation and shown to agents as `origin` on every conversation object.
+
+- **Lookup:** the IP goes to `GEO_IP_LOOKUP_BASE_URL` (ipwho.is by default) to get a two-letter country code.
+- **Enrichment:** the country code goes to `REST_COUNTRIES_BASE_URL` for the name, region, flag, languages and currencies.
+- **Client IP:** taken from the socket address, or from the forwarded address when `TRUST_PROXY_HOP_COUNT` is set (one hop behind a load balancer).
+- **Timeouts:** each call waits at most 3 seconds, and the lookup runs before the database transaction opens.
+
+| `origin.status` | Meaning |
+|---|---|
+| `detected` | Country found. Name, region, flag, languages and currencies are filled when REST Countries answers. |
+| `private_address` | Loopback or private IP. Not looked up. |
+| `unavailable` | Lookup failed or the provider does not know the address. The chat still starts. |
+| `not_attempted` | Conversations created by staff (no visitor IP) keep this status. |
+
+`origin` shape: `{ status, countryCode, countryName, region, flagImageUrl, languages: [string], currencies: [{ code, name, symbol }], detectedAt }`. Visitors never see it.
+
+Layout: `services/geoOriginService.js`, stored with `repositories/conversationsRepository.js` (`updateConversationOrigin`). `GEO_IP_API_KEY` is not used by ipwho.is, which needs no key.

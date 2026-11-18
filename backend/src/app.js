@@ -11,6 +11,9 @@ import { ApplicationError } from './utils/applicationError.js'
 
 export const app = express()
 
+// Behind a load balancer, req.ip must be the visitor's address, not the proxy's (see TRUST_PROXY_HOP_COUNT).
+app.set('trust proxy', environmentConfig.trustProxyHopCount)
+
 // The widget runs on other websites, so its routes accept any origin. They use a bearer token,
 // not the cookie, so no credentials are allowed. The staff allowlist below does not apply to them.
 app.use('/api/widget', cors({ origin: true }))

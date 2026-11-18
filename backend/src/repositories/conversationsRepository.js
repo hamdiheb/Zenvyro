@@ -17,6 +17,14 @@ const SELECT_CONVERSATION_WITH_CUSTOMER = `
          conversations.created_at,
          conversations.updated_at,
          conversations.last_message_at::text AS sort_value,
+         conversations.origin_detection_status,
+         conversations.origin_country_code,
+         conversations.origin_country_name,
+         conversations.origin_region,
+         conversations.origin_flag_image_url,
+         conversations.origin_languages,
+         conversations.origin_currencies,
+         conversations.origin_detected_at,
          COALESCE(
            (SELECT json_agg(json_build_object('id', labels.id, 'name', labels.name, 'colorHex', labels.color_hex)
                             ORDER BY labels.name)
@@ -126,6 +134,33 @@ export async function updateConversationStatusAndMode(
     [conversationId, businessId, status ?? null, mode ?? null, hasAssignedAgentChange, assignedAgentId],
   )
   return result.rowCount > 0
+}
+
+// Stores the detected visitor origin on the conversation. Done once per conversation, when the chat starts.
+export async function updateConversationOrigin(databaseExecutor, { conversationId, origin }) {
+  await databaseExecutor.query(
+    `UPDATE conversations
+     SET origin_detection_status = $2,
+         origin_country_code = $3,
+         origin_country_name = $4,
+         origin_region = $5,
+         origin_flag_image_url = $6,
+         origin_languages = $7::jsonb,
+         origin_currencies = $8::jsonb,
+         origin_detected_at = $9
+     WHERE id = $1`,
+    [
+      conversationId,
+      origin.status,
+      origin.countryCode,
+      origin.countryName,
+      origin.region,
+      origin.flagImageUrl,
+      JSON.stringify(origin.languages),
+      JSON.stringify(origin.currencies),
+      origin.detectedAt,
+    ],
+  )
 }
 
 export async function touchConversationLastMessageAt(databaseExecutor, { conversationId }) {

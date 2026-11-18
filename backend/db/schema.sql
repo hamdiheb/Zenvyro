@@ -190,3 +190,16 @@ CREATE TABLE internal_notes (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX internal_notes_conversation_idx ON internal_notes (conversation_id);
+
+-- Anonymous chat sessions for the embeddable customer widget (see db/migrations/002_widget_sessions.sql).
+CREATE TABLE widget_sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  conversation_id uuid NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  token_hash text NOT NULL UNIQUE CHECK (token_hash ~ '^[0-9a-f]{64}$'),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  CHECK (expires_at > created_at)
+);
+CREATE INDEX widget_sessions_expires_at_idx ON widget_sessions (expires_at);

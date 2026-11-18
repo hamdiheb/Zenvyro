@@ -83,6 +83,8 @@ Base path: `/api/widget`. Visitors are anonymous customers, not staff. They neve
 
 Widget routes accept any browser origin, because they use a bearer token and no cookie.
 
+Widget keys are `wk_` followed by 32 lowercase hex characters. For local development, `db/seed.sql` creates the Acme Shoes demo business with the key `wk_ace5ace5ace5ace5ace5ace5ace5ace5`.
+
 | Method | Path | Auth | Success | Notes |
 |---|---|---|---|---|
 | POST | `/sessions` | `widgetKey` in body | 201 `{ sessionToken, customer, conversation }` | Creates the visitor customer, a conversation and a session token. `name` (default "Website visitor") and `email` are optional. Unknown key: 401. |

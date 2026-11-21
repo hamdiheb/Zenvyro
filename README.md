@@ -405,6 +405,8 @@ The MVP is planned for three weeks. The schedule and feature list are in [ROADMA
 
 ## Documentation
 
+- [System design diagrams: flow, API and database](docs/system-design.md)
+- [Animated request flows: who starts each request and where it ends](docs/system-design-flows.html) (open in a browser)
 - [Product brief](Plan.md)
 - [Roadmap, data model, and architecture decisions](ROADMAP.md)
 - [Backend guide: setup, endpoints, realtime events, widget API, and session design](backend/README.md)

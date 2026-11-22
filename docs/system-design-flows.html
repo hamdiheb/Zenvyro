@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Zenvyro Request Flows</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: a sequence-diagram stage on the left, a "what is happening now" panel on the right; stacks on phones. */
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --fg: #141a23;
+  --muted: #5a6474;
+  --line: #d3d9e2;
+  --faint: #e6eaf0;
+  --accent: #2458d3;   /* HTTP request */
+  --resp: #17845a;     /* HTTP response */
+  --event: #b9620a;    /* Socket.IO event */
+  --db: #7448cc;       /* database */
+  --self: #4f5a6b;     /* internal work */
+  --act: #141a23;      /* person acts */
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116; --surface: #161b23; --fg: #e6eaf0; --muted: #98a2b1; --line: #2b323d; --faint: #1f252e;
+    --accent: #6e9cff; --resp: #4cc58e; --event: #f0a54d; --db: #b497ff; --self: #a3adbb; --act: #e6eaf0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1116; --surface: #161b23; --fg: #e6eaf0; --muted: #98a2b1; --line: #2b323d; --faint: #1f252e;
+  --accent: #6e9cff; --resp: #4cc58e; --event: #f0a54d; --db: #b497ff; --self: #a3adbb; --act: #e6eaf0;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 48px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+header h1 { font-family: var(--font-display); font-size: clamp(26px, 4vw, 36px); margin: 0 0 6px; letter-spacing: -0.01em; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); max-width: 70ch; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.tab {
+  font: 500 14px var(--font-body); color: var(--fg); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 999px; padding: 7px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+}
+.tab:hover { border-color: var(--muted); }
+.tab[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.tab .st { font: 500 10.5px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; }
+.tab:focus-visible, .btn:focus-visible, .steps button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.ends { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.end-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+.end-card .k { font: 600 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+.end-card .k i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.end-card p { margin: 0; font-size: 14px; }
+
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
+@media (max-width: 960px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.stage { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; min-width: 0; }
+.stage svg { display: block; }
+.panel { display: flex; flex-direction: column; gap: 12px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); min-width: 0; }
+@media (max-width: 960px) { .panel { position: static; } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn {
+  font: 500 14px var(--font-body); background: var(--surface); color: var(--fg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 12px; cursor: pointer; min-width: 40px;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); min-width: 88px; }
+:root[data-theme="dark"] .btn.primary { color: #0e1116; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #0e1116; } }
+.speed { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.speed select { font: 13px var(--font-body); background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+.progress { height: 4px; background: var(--faint); border-radius: 4px; overflow: hidden; margin-top: 12px; }
+.progress > div { height: 100%; width: 0; background: var(--accent); transition: width 250ms ease; }
+
+.cap-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.chip { font: 500 11px var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.chip.planned { border-style: dashed; color: var(--muted); }
+.chip.built { color: var(--resp); }
+.chip.tag-start { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.chip.tag-end { background: var(--resp); color: var(--surface); border-color: var(--resp); }
+.chip.tag-reqEnd { color: var(--resp); }
+.cap-n { font: 500 12px var(--font-mono); color: var(--muted); }
+#capTitle { font-family: var(--font-mono); font-size: 14.5px; font-weight: 500; margin: 0 0 6px; overflow-wrap: anywhere; }
+#capWho { font-size: 13.5px; color: var(--muted); margin: 0 0 8px; }
+#capWho b { color: var(--fg); font-weight: 600; }
+#capText { margin: 0; font-size: 14.5px; }
+
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 340px; overflow-y: auto; }
+.steps button {
+  width: 100%; text-align: left; background: none; border: 0; border-radius: 6px; padding: 5px 8px; cursor: pointer;
+  font: 13px var(--font-body); color: var(--muted); display: grid; grid-template-columns: 24px 1fr; gap: 6px;
+}
+.steps button:hover { background: var(--faint); color: var(--fg); }
+.steps button[aria-current="step"] { background: var(--faint); color: var(--fg); font-weight: 600; }
+.steps .n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.steps .done { color: var(--fg); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend svg { overflow: visible; }
+
+/* SVG */
+.lane-box { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; transition: stroke 200ms, fill 200ms; }
+.lane.on .lane-box { stroke: var(--fg); stroke-width: 2; fill: var(--faint); }
+.lane.planned .lane-box { stroke-dasharray: 5 4; }
+.lane-name { font: 600 13px var(--font-display); fill: var(--fg); }
+.lane-sub { font: 400 10.5px var(--font-mono); fill: var(--muted); }
+.lifeline { stroke: var(--line); stroke-width: 1.2; stroke-dasharray: 3 5; }
+.step { transition: opacity 250ms; }
+.step .arrow { fill: none; stroke-width: 1.8; }
+.step.planned .arrow { stroke-dasharray: 6 4; }
+.step .lbl { font: 500 11.5px var(--font-mono); paint-order: stroke; stroke: var(--surface); stroke-width: 5px; stroke-linejoin: round; }
+.step .num { font: 500 11px var(--font-mono); fill: var(--muted); }
+.step.future { opacity: 0.12; }
+.step.past { opacity: 0.5; }
+.step.current .arrow { stroke-width: 3; }
+.step.current .num { fill: var(--fg); font-weight: 700; }
+.row-hi { fill: var(--faint); opacity: 0; transition: opacity 200ms; }
+.step.current .row-hi { opacity: 0.75; }
+.pill rect { stroke: none; }
+.pill text { font: 700 9.5px var(--font-mono); letter-spacing: 0.08em; fill: var(--surface); }
+.pill.start rect { fill: var(--accent); }
+.pill.end rect { fill: var(--resp); }
+.pill.reqEnd rect { fill: var(--surface); stroke: var(--resp); stroke-width: 1.2; }
+.pill.reqEnd text { fill: var(--resp); }
+.k-req { color: var(--accent); } .k-res { color: var(--resp); } .k-evt { color: var(--event); }
+.k-db { color: var(--db); } .k-self { color: var(--self); } .k-act { color: var(--act); }
+.step .arrow { stroke: currentColor; }
+.step .lbl { fill: currentColor; }
+.packet { fill: var(--fg); filter: drop-shadow(0 0 4px var(--accent)); }
+.branch { font: italic 500 11px var(--font-body); fill: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .step, .lane-box, .progress > div { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Zenvyro · system design</div>
+    <h1>Who starts a request, and where it ends</h1>
+    <p>Pick a flow and press Play. A dot travels from the part that sends each message to the part that receives it. <b>START</b> marks who begins the flow, <b>REQUEST ENDS</b> marks where an HTTP call gets its response, and <b>END</b> marks the last thing that happens.</p>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="Flows"></nav>
+
+  <section class="ends" aria-label="Flow summary">
+    <div class="end-card"><div class="k k-req"><i style="background:var(--accent)"></i>Starts</div><p id="sumStart"></p></div>
+    <div class="end-card"><div class="k k-res"><i style="background:var(--resp)"></i>Ends</div><p id="sumEnd"></p></div>
+    <div class="end-card"><div class="k" style="color:var(--muted)"><i style="background:var(--muted)"></i>Status</div><p id="sumStatus"></p></div>
+  </section>
+
+  <div class="main">
+    <div class="stage" id="stage" aria-label="Sequence diagram"></div>
+
+    <aside class="panel">
+      <div class="card">
+        <div class="controls">
+          <button class="btn" id="bRestart" title="Back to overview">⟲</button>
+          <button class="btn" id="bPrev" title="Previous step (←)">◀</button>
+          <button class="btn primary" id="bPlay" title="Play or pause (space)">▶ Play</button>
+          <button class="btn" id="bNext" title="Next step (→)">▶|</button>
+          <label class="speed" for="speed">Speed
+            <select id="speed"><option value="0.6">Slow</option><option value="1" selected>Normal</option><option value="1.8">Fast</option></select>
+          </label>
+        </div>
+        <div class="progress"><div id="prog"></div></div>
+      </div>
+
+      <div class="card" aria-live="polite">
+        <div class="cap-meta" id="capMeta"></div>
+        <p id="capTitle"></p>
+        <p id="capWho"></p>
+        <p id="capText"></p>
+      </div>
+
+      <div class="card">
+        <ol class="steps" id="steps"></ol>
+      </div>
+
+      <div class="legend" aria-label="Legend">
+        <span class="k-req"><svg width="22" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="currentColor" stroke-width="2"/></svg>HTTP request</span>
+        <span class="k-res"><svg width="22" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="currentColor" stroke-width="2"/></svg>Response</span>
+        <span class="k-evt"><svg width="22" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="currentColor" stroke-width="2"/></svg>Socket.IO event</span>
+        <span class="k-db"><svg width="22" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="currentColor" stroke-width="2"/></svg>Database</span>
+        <span class="k-self"><svg width="22" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="currentColor" stroke-width="2"/></svg>Internal work</span>
+        <span><svg width="22" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="currentColor" stroke-width="2" stroke-dasharray="5 3"/></svg>Planned (not built yet)</span>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const LANES = {
+  visitor: { name: "Visitor", sub: "customer's browser" },
+  widget:  { name: "Widget", sub: "iframe on store site" },
+  agent:   { name: "Agent inbox", sub: "React SPA" },
+  api:     { name: "Express API", sub: "Node :4000" },
+  geo:     { name: "Geo-origin", sub: "ipwho.is + REST Countries" },
+  db:      { name: "PostgreSQL", sub: "system of record" },
+  socket:  { name: "Socket.IO", sub: "realtime gateway" },
+  router:  { name: "Conv. router", sub: "mode ai | human", planned: true },
+  ai:      { name: "AI pipeline", sub: "autopilot", planned: true },
+  ver:     { name: "Verifier", sub: "copilot checks", planned: true },
+  llm:     { name: "OpenRouter", sub: "LLM", planned: true },
+};
+
+const FLOWS = [
+  {
+    id: "widget-start", name: "Visitor opens the widget", status: "built",
+    starts: "The visitor's browser, when the store page loads the widget for the first time.",
+    ends: "The HTTP call ends when the widget receives its session token (step 7). The flow ends when the agent inbox shows the new conversation (step 9).",
+    lanes: ["visitor", "widget", "api", "geo", "db", "socket", "agent"],
+    steps: [
+      { f: "visitor", t: "widget", k: "act", tag: "start", s: "page loads widget", d: "The store page includes zenvyro-widget.js with a data-widget-key. The loader injects an iframe at /widget?key=wk_…. No token is saved in localStorage yet, so this is a new visitor." },
+      { f: "widget", t: "api", k: "req", s: "POST /api/widget/sessions", d: "The widget sends {widgetKey, name?, email?}. This route is public: the widget key identifies the business, and no cookie is involved. CORS allows any origin on /api/widget." },
+      { f: "api", t: "db", k: "db", s: "find business by widget_key", d: "The API looks up the business that owns this key. If no business has it, the request ends here with 401." },
+      { f: "api", t: "geo", k: "req", s: "lookup(request.ip)", d: "The geo lookup runs before the database transaction opens, so a slow external call never holds a transaction open. Private IPs are skipped, and the timeout is 3 seconds." },
+      { f: "geo", t: "api", k: "res", s: "country, region, flag…", d: "Returns the origin details, or the status 'unavailable' if the lookup failed. A failed lookup never blocks the chat." },
+      { f: "api", t: "db", k: "db", s: "BEGIN · 3 INSERTs · COMMIT", d: "One transaction creates the customer ('Website visitor' if no name was given), the conversation with its origin_* columns, and the widget_session. Only the SHA-256 hash of the token is stored." },
+      { f: "api", t: "widget", k: "res", tag: "reqEnd", s: "201 {sessionToken, …}", d: "The HTTP request ends here. The widget saves the token in localStorage under zenvyro.widgetSession.<key> and shows the chat thread." },
+      { f: "api", t: "socket", k: "self", s: "publish conversation:created", d: "After the commit, the controller publishes the event through the Socket.IO server in the same process. It is sent to the room business:{id}, which only staff sockets join." },
+      { f: "socket", t: "agent", k: "evt", tag: "end", s: "conversation:created", d: "Every agent signed in to this business sees the new conversation in the inbox at once. The widget then connects its own socket with the token and joins conversation:{id}." },
+    ],
+  },
+  {
+    id: "widget-resume", name: "Returning visitor", status: "built",
+    starts: "The visitor's browser, when the widget finds a saved token in localStorage.",
+    ends: "The HTTP call ends when the thread is loaded (step 5). The flow ends when the widget's socket joins its conversation room (step 7).",
+    lanes: ["visitor", "widget", "api", "db", "socket"],
+    steps: [
+      { f: "visitor", t: "widget", k: "act", tag: "start", s: "reopens the store page", d: "The widget finds zenvyro.widgetSession.<key> in localStorage. Tokens last 30 days." },
+      { f: "widget", t: "api", k: "req", s: "GET /api/widget/session", d: "Sent with the header 'Authorization: Bearer <token>'. The widget never uses cookies." },
+      { f: "api", t: "db", k: "db", s: "find by SHA-256(token)", d: "The middleware hashes the token and looks for an unexpired widget_session. If there is none, the API returns 401. The widget then deletes the token and starts the 'Visitor opens the widget' flow again." },
+      { f: "db", t: "api", k: "res", s: "session + newest 50 messages", d: "Returns the conversation and its newest 50 messages, oldest first." },
+      { f: "api", t: "widget", k: "res", tag: "reqEnd", s: "200 {business, conversation, messages}", d: "The HTTP request ends here, and the widget renders the past conversation." },
+      { f: "widget", t: "socket", k: "evt", s: "connect auth {widgetSessionToken}", d: "The widget opens a socket with the token. A widget token always marks the socket as a visitor, even if the browser also sends a staff cookie." },
+      { f: "socket", t: "widget", k: "evt", tag: "end", s: "joined conversation:{id}", d: "The gateway puts the socket in its own conversation room. From now on, new messages arrive live. Visitors cannot join any other room." },
+    ],
+  },
+  {
+    id: "customer-message", name: "Customer sends a message", status: "built",
+    starts: "The visitor, when they press Send in the widget.",
+    ends: "The HTTP call ends with 201 to the widget (step 5). The flow ends when the agent inbox re-sorts the conversation (step 9).",
+    lanes: ["visitor", "widget", "api", "db", "socket", "agent"],
+    steps: [
+      { f: "visitor", t: "widget", k: "act", tag: "start", s: "types and presses Send", d: "The customer writes a message in the widget." },
+      { f: "widget", t: "api", k: "req", s: "POST /api/widget/messages", d: "Sends {body} with the Bearer token. The token already tells the API which conversation this is, so the URL carries no id." },
+      { f: "api", t: "db", k: "db", s: "BEGIN · SELECT … FOR UPDATE", d: "Locks the conversation row, so two messages arriving at the same moment cannot interleave their status changes." },
+      { f: "api", t: "db", k: "db", s: "reopen? · INSERT · COMMIT", d: "If the conversation was resolved, it goes back to 'open'. The message is inserted with sender_type = customer, last_message_at is updated, and the transaction commits." },
+      { f: "api", t: "widget", k: "res", tag: "reqEnd", s: "201 {message}", d: "The HTTP request ends here, and the widget shows the message as sent." },
+      { f: "api", t: "socket", k: "self", s: "publish after commit", d: "Events are sent only after the commit, so nobody ever receives a message that was rolled back." },
+      { f: "socket", t: "widget", k: "evt", s: "message:created", d: "Sent to conversation:{id}. The widget merges messages by id, so its own message does not appear twice." },
+      { f: "socket", t: "agent", k: "evt", s: "message:created", d: "Any agent who has joined this conversation's room (conversation:join) sees the message in the open thread." },
+      { f: "socket", t: "agent", k: "evt", tag: "end", s: "conversation:updated", d: "Sent to business:{id}. Every agent's inbox moves the conversation to the top with the new lastMessage preview." },
+    ],
+  },
+  {
+    id: "agent-reply", name: "Agent replies (Copilot)", status: "partial",
+    starts: "The agent, when they write a draft in the reply box.",
+    ends: "The verification call ends at step 9 (Planned). The send call ends with 201 at step 13. The flow ends when the customer's widget shows the reply (step 15).",
+    lanes: ["agent", "api", "ver", "llm", "db", "socket", "widget"],
+    steps: [
+      { f: "agent", t: "agent", k: "act", tag: "start", s: "writes a draft", d: "Example: 'Don't worry, we will definitely refund you tomorrow.'" },
+      { f: "agent", t: "api", k: "req", p: 1, s: "POST /:id/draft-verifications", d: "Planned. The draft is sent for checking before anything reaches the customer. It uses the staff cookie zenvyro_session." },
+      { f: "api", t: "db", k: "db", p: 1, s: "load rules + brand_tone", d: "Planned. Loads the business's enabled business_rules and its brand_tone." },
+      { f: "api", t: "ver", k: "req", p: 1, s: "verify(draft, rules, tone)", d: "Planned. Calls the verification service." },
+      { f: "ver", t: "llm", k: "req", p: 1, s: "JSON-schema prompt", d: "Planned. The model must answer in a fixed JSON shape, which the code validates. A fallback model chain with retries handles rate limits." },
+      { f: "llm", t: "ver", k: "res", p: 1, s: "{grammar, policy, tone, issues, suggestion}", d: "Planned. Example verdict: policy failed (it promises a refund and a delivery date), tone needs improvement, plus a compliant rewrite." },
+      { f: "ver", t: "db", k: "db", p: 1, s: "INSERT verification + ai_event", d: "Planned. Stores the result in message_verifications and logs the model call in ai_events (latency, model name, confidence)." },
+      { f: "ver", t: "api", k: "res", p: 1, s: "verdicts", d: "Planned. Returns the verdicts to the API." },
+      { f: "api", t: "agent", k: "res", p: 1, tag: "reqEnd", s: "verdicts + suggested rewrite", d: "Planned. The verification request ends here. Nothing has been sent to the customer yet." },
+      { f: "agent", t: "agent", k: "act", p: 1, s: "approve · edit · reject", d: "Planned. The agent decides. The choice is saved as agent_action on the verification." },
+      { f: "agent", t: "api", k: "req", s: "POST /:id/messages", d: "Built. Sends the final {body}, 1 to 5000 characters." },
+      { f: "api", t: "db", k: "db", s: "lock · INSERT · COMMIT", d: "Built. Locks the conversation row. If the conversation is resolved, the API returns 409. Otherwise it inserts the message with sender_type = agent and sender_id = the user's id." },
+      { f: "api", t: "agent", k: "res", tag: "reqEnd", s: "201 {message}", d: "The send request ends here." },
+      { f: "api", t: "socket", k: "self", s: "publish after commit", d: "Publishes message:created to conversation:{id} and conversation:updated to business:{id}." },
+      { f: "socket", t: "widget", k: "evt", tag: "end", s: "message:created", d: "The customer sees the reply in the widget. Only the approved text was ever sent." },
+    ],
+  },
+  {
+    id: "autopilot", name: "AI Autopilot reply", status: "planned",
+    starts: "The customer's message, in a conversation whose mode is 'ai'.",
+    ends: "If the AI is confident, its reply reaches the widget (step 13). If not, the conversation is escalated and appears in the agent queue (step 15).",
+    lanes: ["widget", "api", "router", "ai", "llm", "db", "socket", "agent"],
+    steps: [
+      { f: "widget", t: "api", k: "req", tag: "start", s: "POST /api/widget/messages", d: "The message is saved and broadcast exactly as in 'Customer sends a message'. The difference is what happens next." },
+      { f: "api", t: "router", k: "req", p: 1, s: "conversation.mode = ai", d: "Planned. The conversation router sees that AI handles this conversation and passes it to the AI pipeline." },
+      { f: "router", t: "ai", k: "req", p: 1, s: "run(conversation, history)", d: "Planned. This should run as background work, so the customer's POST is never held open while the model thinks." },
+      { f: "ai", t: "llm", k: "req", p: 1, s: "classify intent", d: "Planned. Example intents: refund request, order status, product question." },
+      { f: "llm", t: "ai", k: "res", p: 1, s: "{intent, entities, confidence}", d: "Planned." },
+      { f: "ai", t: "db", k: "db", p: 1, s: "search knowledge_articles", d: "Planned. Full-text search on search_vector, using the GIN index, scoped to the business." },
+      { f: "ai", t: "db", k: "db", p: 1, s: "load business_rules", d: "Planned. Loads only enabled rules, such as 'Never guarantee delivery dates'." },
+      { f: "ai", t: "llm", k: "req", p: 1, s: "generate reply", d: "Planned. The prompt includes the context, the matched articles, the rules and the brand tone." },
+      { f: "llm", t: "ai", k: "res", p: 1, s: "{reply, confidence}", d: "Planned." },
+      { f: "ai", t: "ai", k: "self", p: 1, s: "confidence gate + rule check", d: "Planned. The escalation decider weighs confidence, intent, sentiment and any rule hits, then chooses 'answer' or 'escalate'." },
+      { f: "ai", t: "db", k: "db", p: 1, s: "INSERT ai_events", d: "Planned. Logs each step (type, confidence, latency, model) so AI behaviour can be audited." },
+      { f: "ai", t: "socket", k: "evt", p: 1, branch: "if confident", s: "message:created (sender ai)", d: "Planned. The reply is saved with sender_type = ai and published to the conversation room." },
+      { f: "socket", t: "widget", k: "evt", p: 1, tag: "end", s: "AI reply shown", d: "Planned. End of the confident path: the customer reads the AI's answer." },
+      { f: "ai", t: "db", k: "db", p: 1, branch: "if not confident", s: "status=escalated, mode=human", d: "Planned. The AI does not answer. The conversation is handed to humans instead." },
+      { f: "socket", t: "agent", k: "evt", p: 1, tag: "end", s: "conversation:updated", d: "Planned. End of the escalation path: the conversation appears in the agents' queue as escalated." },
+    ],
+  },
+  {
+    id: "sign-in", name: "Staff signs in", status: "built",
+    starts: "The agent, when they submit the sign-in form.",
+    ends: "The HTTP call ends with the session cookie (step 5). The flow ends when the agent's socket joins the business room (step 7).",
+    lanes: ["agent", "api", "db", "socket"],
+    steps: [
+      { f: "agent", t: "api", k: "req", tag: "start", s: "POST /api/authentication/sign-in", d: "Sends {email, password}. In development, Vite proxies /api to the backend, so the cookie is same-origin." },
+      { f: "api", t: "db", k: "db", s: "SELECT user by email", d: "Looks up the user by email. Emails are unique across all businesses." },
+      { f: "api", t: "api", k: "self", s: "bcrypt.compare", d: "If the email is unknown, the password is compared against a dummy hash, so the response takes the same time. Both failures return the same 401." },
+      { f: "api", t: "db", k: "db", s: "INSERT session (token hash)", d: "Creates 32 random bytes as the token. Only its SHA-256 hash is stored. It expires in 3 days." },
+      { f: "api", t: "agent", k: "res", tag: "reqEnd", s: "200 {user, business} + Set-Cookie", d: "The HTTP request ends here. The zenvyro_session cookie is HttpOnly and SameSite=Lax, and Secure in production." },
+      { f: "agent", t: "socket", k: "evt", s: "connect (cookie)", d: "The inbox opens one shared socket. The gateway checks the cookie the same way the REST middleware does." },
+      { f: "socket", t: "agent", k: "evt", tag: "end", s: "joined business:{id}", d: "Every staff socket joins its business room, so inbox events now arrive live. Opening a thread sends conversation:join for that conversation." },
+    ],
+  },
+];
+
+const KIND_NAME = { req: "HTTP request", res: "Response", evt: "Socket.IO event", db: "Database", self: "Internal work", act: "Person acts" };
+const TAG_NAME = { start: "START", end: "END", reqEnd: "REQUEST ENDS" };
+const COL = 134, LEFT = 40, TOP = 86, ROW = 54, NS = "http://www.w3.org/2000/svg";
+const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const $ = (id) => document.getElementById(id);
+let flow = FLOWS[0], cur = -1, playing = false, speed = 1, timer = null, anim = null, token = 0;
+
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+const statusText = (s) => s === "built" ? "Built: this flow runs in the code today." : s === "planned" ? "Planned: designed in the README, not built yet." : "Partly built: dashed steps are planned.";
+
+function buildTabs() {
+  $("tabs").innerHTML = FLOWS.map((f) =>
+    `<button class="tab" data-id="${f.id}" aria-pressed="${f === flow}">${esc(f.name)}<span class="st">${f.status === "partial" ? "partly built" : f.status}</span></button>`).join("");
+  $("tabs").querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => selectFlow(b.dataset.id, true)));
+}
+
+function laneX(id) { return LEFT + flow.lanes.indexOf(id) * COL + COL / 2; }
+
+function buildStage() {
+  const n = flow.lanes.length, W = LEFT + n * COL + 20, H = TOP + flow.steps.length * ROW + 24;
+  let h = `<svg xmlns="${NS}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(flow.name)} sequence diagram">`;
+  h += `<defs>${Object.keys(KIND_NAME).map((k) => `<marker id="m-${k}" class="k-${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:currentColor"/></marker>`).join("")}</defs>`;
+  flow.lanes.forEach((id) => {
+    const L = LANES[id], x = laneX(id);
+    h += `<line class="lifeline" x1="${x}" y1="${TOP - 18}" x2="${x}" y2="${H - 8}"/>`;
+    h += `<g class="lane${L.planned ? " planned" : ""}" data-lane="${id}"><rect class="lane-box" x="${x - COL / 2 + 8}" y="14" width="${COL - 16}" height="48" rx="8"/>
+      <text class="lane-name" x="${x}" y="35" text-anchor="middle">${esc(L.name)}</text>
+      <text class="lane-sub" x="${x}" y="51" text-anchor="middle">${esc(L.sub)}</text></g>`;
+  });
+  flow.steps.forEach((s, i) => { h += `<g class="step future k-${s.k}${s.p ? " planned" : ""}" data-i="${i}"><rect class="row-hi" x="4" y="${TOP + i * ROW + 4}" width="${W - 8}" height="${ROW - 6}" rx="6"/></g>`; });
+  h += `</svg>`;
+  $("stage").innerHTML = h;
+  const svg = $("stage").querySelector("svg");
+  flow.steps.forEach((s, i) => {
+    const g = svg.querySelector(`.step[data-i="${i}"]`), y = TOP + i * ROW + ROW / 2 + 8;
+    let d, lx, ly, anchor = "middle", x1 = laneX(s.f), x2 = laneX(s.t);
+    if (s.f === s.t) {
+      d = `M${x1 + 4},${y - 11} h30 v18 h-30`; lx = x1 + 42; ly = y + 2; anchor = "start";
+    } else {
+      const dir = x2 > x1 ? 1 : -1; x1 += 5 * dir; x2 -= 7 * dir;
+      d = `M${x1},${y} L${x2},${y}`; lx = (x1 + x2) / 2; ly = y - 8;
+    }
+    let inner = `<text class="num" x="14" y="${y + 4}">${String(i + 1).padStart(2, "0")}</text>`;
+    inner += `<path class="arrow" d="${d}" marker-end="url(#m-${s.k})"/>`;
+    inner += `<text class="lbl" x="${lx}" y="${ly}" text-anchor="${anchor}">${esc(s.s)}</text>`;
+    if (s.branch && s.branch.startsWith("if")) inner += `<text class="branch" x="${lx}" y="${y + 18}" text-anchor="${anchor}">${esc(s.branch)}</text>`;
+    if (s.tag) {
+      const label = TAG_NAME[s.tag], w = label.length * 6.6 + 12;
+      const px = s.tag === "start" ? laneX(s.f) - w / 2 : laneX(s.t) - w / 2;
+      const py = s.f === s.t && s.tag === "start" ? y + 10 : y + 6;
+      inner += `<g class="pill ${s.tag}"><rect x="${px}" y="${py}" width="${w}" height="15" rx="7.5"/><text x="${px + w / 2}" y="${py + 10.5}" text-anchor="middle">${label}</text></g>`;
+    }
+    g.insertAdjacentHTML("beforeend", inner);
+  });
+  const p = document.createElementNS(NS, "circle"); p.setAttribute("r", "6.5"); p.setAttribute("class", "packet"); p.style.display = "none"; p.id = "packet";
+  svg.appendChild(p);
+}
+
+function buildSteps() {
+  $("steps").innerHTML = flow.steps.map((s, i) =>
+    `<li><button data-i="${i}"><span class="n">${String(i + 1).padStart(2, "0")}</span><span>${s.tag === "start" ? "▶ " : s.tag === "end" ? "■ " : ""}${esc(LANES[s.f].name)} → ${esc(LANES[s.t].name)}: ${esc(s.s)}</span></button></li>`).join("");
+  $("steps").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { pause(); go(+b.dataset.i); }));
+}
+
+function selectFlow(id, fromUser) {
+  flow = FLOWS.find((f) => f.id === id) || FLOWS[0];
+  pause(); cur = -1;
+  $("tabs").querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.id === flow.id)));
+  $("sumStart").textContent = flow.starts; $("sumEnd").textContent = flow.ends; $("sumStatus").textContent = statusText(flow.status);
+  buildStage(); buildSteps(); paint();
+  if (fromUser) { try { history.replaceState(null, "", "#" + flow.id); } catch (e) {} }
+}
+
+function paint() {
+  const svg = $("stage").querySelector("svg"), N = flow.steps.length;
+  svg.querySelectorAll(".step").forEach((g) => {
+    const i = +g.dataset.i;
+    g.classList.toggle("future", cur >= 0 && i > cur);
+    g.classList.toggle("past", cur >= 0 && i < cur);
+    g.classList.toggle("current", i === cur);
+  });
+  const s = flow.steps[cur];
+  svg.querySelectorAll(".lane").forEach((l) => l.classList.toggle("on", !!s && (l.dataset.lane === s.f || l.dataset.lane === s.t)));
+  $("steps").querySelectorAll("button").forEach((b) => {
+    const i = +b.dataset.i;
+    if (i === cur) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
+    b.classList.toggle("done", i < cur);
+  });
+  const cb = $("steps").querySelector(`button[data-i="${cur}"]`);
+  if (cb) cb.scrollIntoView({ block: "nearest" });
+  $("prog").style.width = cur < 0 ? "0%" : ((cur + 1) / N * 100) + "%";
+  if (!s) {
+    $("capMeta").innerHTML = `<span class="cap-n">Overview · ${N} steps</span>`;
+    $("capTitle").textContent = flow.name;
+    $("capWho").innerHTML = `Starts with <b>${esc(LANES[flow.steps[0].f].name)}</b>.`;
+    $("capText").textContent = "Press Play to watch each step, or click a step in the list. Shortcuts: space plays or pauses, the arrow keys step.";
+  } else {
+    let meta = `<span class="cap-n">Step ${cur + 1} of ${N}</span><span class="chip k-${s.k}">${KIND_NAME[s.k]}</span>`;
+    meta += s.p ? `<span class="chip planned">Planned</span>` : `<span class="chip built">Built</span>`;
+    if (s.tag) meta += `<span class="chip tag-${s.tag}">${TAG_NAME[s.tag]}</span>`;
+    $("capMeta").innerHTML = meta;
+    $("capTitle").textContent = s.s;
+    $("capWho").innerHTML = s.f === s.t ? `<b>${esc(LANES[s.f].name)}</b> works on its own` : `<b>${esc(LANES[s.f].name)}</b> → <b>${esc(LANES[s.t].name)}</b>`;
+    $("capText").textContent = s.d;
+  }
+  $("bPlay").textContent = playing ? "❚❚ Pause" : (cur >= N - 1 ? "⟲ Replay" : "▶ Play");
+}
+
+function runPacket(i, done) {
+  const my = ++token, svg = $("stage").querySelector("svg"), pk = svg.querySelector("#packet");
+  const path = svg.querySelector(`.step[data-i="${i}"] .arrow`);
+  if (reduce || !path) { pk.style.display = "none"; done(); return; }
+  const len = path.getTotalLength(), dur = 800 / speed, t0 = performance.now();
+  pk.style.display = ""; pk.style.fill = getComputedStyle(path).stroke;
+  const tick = (now) => {
+    if (my !== token) return;
+    const k = Math.min(1, (now - t0) / dur), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    const pt = path.getPointAtLength(e * len);
+    pk.setAttribute("cx", pt.x); pk.setAttribute("cy", pt.y);
+    if (k < 1) anim = requestAnimationFrame(tick); else { pk.style.display = "none"; done(); }
+  };
+  anim = requestAnimationFrame(tick);
+}
+
+function go(i, auto) {
+  clearTimeout(timer); cancelAnimationFrame(anim); token++;
+  cur = Math.max(-1, Math.min(i, flow.steps.length - 1));
+  paint();
+  if (cur < 0) return;
+  runPacket(cur, () => {
+    if (!playing) return;
+    if (cur >= flow.steps.length - 1) { playing = false; paint(); return; }
+    timer = setTimeout(() => go(cur + 1, true), 2000 / speed);
+  });
+}
+
+function play() { playing = true; if (cur >= flow.steps.length - 1) cur = -1; go(cur + 1, true); }
+function pause() {
+  playing = false; clearTimeout(timer);
+  $("bPlay").textContent = cur >= flow.steps.length - 1 ? "⟲ Replay" : "▶ Play";
+}
+
+$("bPlay").addEventListener("click", () => (playing ? pause() : play()));
+$("bNext").addEventListener("click", () => { pause(); go(cur + 1); });
+$("bPrev").addEventListener("click", () => { pause(); go(cur - 1); });
+$("bRestart").addEventListener("click", () => { pause(); go(-1); });
+$("speed").addEventListener("change", (e) => { speed = +e.target.value; });
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest && e.target.closest("select")) return;
+  if (e.key === " ") { e.preventDefault(); playing ? pause() : play(); }
+  else if (e.key === "ArrowRight") { pause(); go(cur + 1); }
+  else if (e.key === "ArrowLeft") { pause(); go(cur - 1); }
+});
+window.addEventListener("hashchange", () => selectFlow(location.hash.slice(1), false));
+
+buildTabs();
+selectFlow(location.hash.slice(1), false);
+</script>
+
+</body>
+</html>

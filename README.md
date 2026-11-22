@@ -288,7 +288,7 @@ docker compose up -d postgres
 docker compose ps    # wait until the status is "healthy"
 ```
 
-Port 5432 must be free on your machine. Stop any local PostgreSQL first.
+Postgres is published on host port 5433 (container port 5432). Port 5433 must be free on your machine.
 
 ### 3. Create the development schema and seed data
 
@@ -405,6 +405,8 @@ The MVP is planned for three weeks. The schedule and feature list are in [ROADMA
 
 ## Documentation
 
+- [System design diagrams: flow, API and database](docs/system-design.md)
+- [Animated request flows: who starts each request and where it ends](docs/system-design-flows.html) (open in a browser)
 - [Product brief](Plan.md)
 - [Roadmap, data model, and architecture decisions](ROADMAP.md)
 - [Backend guide: setup, endpoints, realtime events, widget API, and session design](backend/README.md)

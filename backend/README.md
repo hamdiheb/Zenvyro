@@ -6,7 +6,7 @@ Express 5 API for the support platform. Raw SQL on PostgreSQL through `pg`, no O
 
 1. Copy `../.env.example` to `../.env` (the `saas/` folder) and fill in real values. Never commit `.env`.
 2. Start Postgres from `saas/`: `docker compose up -d postgres`. Wait until `docker compose ps` shows the container as `healthy`.
-   - The compose file publishes port 5432 to the host. Stop any local PostgreSQL that already uses that port first.
+   - The compose file publishes Postgres on host port 5433 (container port 5432). Make sure nothing else uses 5433.
    - The `saad_test` database is created only when the data volume is first created. If it is missing, run `docker compose down -v` and then `docker compose up -d postgres` again. That deletes the volume's data.
 3. Run tests from `backend/`: `npm test`. Tests run against `TEST_DATABASE_URL` (the `saad_test` database). The test setup applies `db/schema.sql` itself if the tables are missing.
 

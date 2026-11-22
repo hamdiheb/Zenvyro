@@ -288,7 +288,7 @@ docker compose up -d postgres
 docker compose ps    # wait until the status is "healthy"
 ```
 
-Port 5432 must be free on your machine. Stop any local PostgreSQL first.
+Postgres is published on host port 5433 (container port 5432). Port 5433 must be free on your machine.
 
 ### 3. Create the development schema and seed data
 

@@ -17,17 +17,18 @@ services:
   migrate:
     image: postgres:16-alpine
     restart: "no"
-    env_file: .env
-    environment:
-      PGPASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       db:
         condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
     volumes:
       - ./backend/db/migrations:/migrations:ro
-    command: >
-      psql -h db -U ${POSTGRES_USER} -d ${POSTGRES_DB}
-      -v ON_ERROR_STOP=1 -f /migrations/001_initial_schema.sql
+      - ./backend/db/migrate.sh:/migrate.sh:ro
+    command: sh /migrate.sh
 
   adminer:
     image: adminer

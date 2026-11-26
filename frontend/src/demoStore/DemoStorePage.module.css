@@ -1,0 +1,61 @@
+.store {
+  min-height: 100vh;
+  background: var(--color-surface);
+}
+
+.announcement {
+  padding: var(--space-2) var(--space-4);
+  background: #c2410c;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  text-align: center;
+  color: #ffffff;
+}
+
+.storeBrand {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.02em;
+}
+
+.storeLinks {
+  display: flex;
+  gap: var(--space-6);
+}
+
+.storeLinks a {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.storeLinks a:hover {
+  color: #c2410c;
+}
+
+.setupNotice {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-warning-soft);
+  font-size: var(--font-size-small);
+  text-align: center;
+  color: var(--color-warning-text);
+}
+
+.heroLink {
+  display: inline-block;
+}
+
+.heroArt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 440px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 30px 60px rgba(194, 65, 12, 0.12);
+  color: #ea580c;
+  transform: rotate(-8deg);
+}

@@ -1,0 +1,67 @@
+.footer {
+  padding: var(--space-12) var(--space-8) var(--space-6);
+  background: var(--color-text);
+  color: #c9cbe0;
+}
+
+.inner {
+  display: grid;
+  grid-template-columns: 2fr repeat(3, 1fr);
+  gap: var(--space-8);
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.brandName {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-on-primary);
+}
+
+.tagline {
+  max-width: 280px;
+  margin-top: var(--space-2);
+  font-size: var(--font-size-small);
+}
+
+.columnTitle {
+  margin-bottom: var(--space-3);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-on-primary);
+}
+
+.column li + li {
+  margin-top: var(--space-2);
+}
+
+.link {
+  font-size: var(--font-size-small);
+  color: #c9cbe0;
+}
+
+.link:hover {
+  color: var(--color-on-primary);
+}
+
+.bottomNote {
+  max-width: 1120px;
+  margin: var(--space-10) auto 0;
+  padding-top: var(--space-5);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: var(--font-size-caption);
+}
+
+@media (max-width: 720px) {
+  .footer {
+    padding: var(--space-8) var(--space-4) var(--space-5);
+  }
+
+  .inner {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .brandBlock {
+    grid-column: 1 / -1;
+  }
+}

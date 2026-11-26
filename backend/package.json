@@ -9,9 +9,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
-    "lint": "eslint .",
-    "db:migrate": "node src/db/databaseCommands.js migrate",
-    "db:seed": "node src/db/databaseCommands.js seed"
+    "lint": "eslint ."
   },
   "engines": {
     "node": ">=20"

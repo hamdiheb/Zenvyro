@@ -27,6 +27,11 @@ try:
 except Exception:
     sys.exit(0)  # not a git repo / git unavailable: don't get in the way
 
+# Short-lived feature branches (cut from integration-test, merged back) may touch either folder.
+FEATURE_BRANCH_PREFIXES = ("feat/", "fix/", "refactor/", "chore/", "test/", "docs/")
+if branch.startswith(FEATURE_BRANCH_PREFIXES):
+    sys.exit(0)
+
 if branch != area:
     print(
         f"WRONG BRANCH: you are trying to change `{rel}` (the {area} folder) "

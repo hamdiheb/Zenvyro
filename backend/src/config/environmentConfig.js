@@ -7,16 +7,22 @@ if (!databaseUrl) {
 }
 
 const THREE_DAYS_IN_SECONDS = 3 * 24 * 60 * 60
+const SEVEN_DAYS_IN_SECONDS = 7 * 24 * 60 * 60
 const nodeEnvironment = process.env.NODE_ENV ?? 'development'
+const corsAllowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)
 
 export const environmentConfig = Object.freeze({
   databaseUrl,
   nodeEnvironment,
   port: Number(process.env.PORT ?? 4000),
-  corsAllowedOrigins: (process.env.CORS_ALLOWED_ORIGINS ?? '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean),
+  corsAllowedOrigins,
+  // Where the staff app runs. Invitation links point here. Defaults to the first allowed CORS origin.
+  staffAppBaseUrl: (process.env.STAFF_APP_BASE_URL ?? corsAllowedOrigins[0] ?? 'http://localhost:5173')
+    .replace(/\/+$/, ''),
+  invitationDurationSeconds: SEVEN_DAYS_IN_SECONDS,
   sessionCookieName: 'zenvyro_session',
   sessionDurationSeconds: THREE_DAYS_IN_SECONDS,
   sessionDurationMilliseconds: THREE_DAYS_IN_SECONDS * 1000,

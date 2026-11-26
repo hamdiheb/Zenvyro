@@ -1,5 +1,10 @@
 import { environmentConfig } from '../config/environmentConfig.js'
-import { signUpBusinessOwner, signInUser, signOutSession } from '../services/authenticationService.js'
+import {
+  signUpBusinessOwner,
+  signInUser,
+  signOutSession,
+  acceptStaffInvitation,
+} from '../services/authenticationService.js'
 
 function buildSessionCookieOptions() {
   return {
@@ -25,6 +30,13 @@ export async function signIn(request, response) {
   const { user, business, sessionToken } = await signInUser(request.validatedBody)
   setSessionCookie(response, sessionToken)
   response.status(200).json({ user, business })
+}
+
+// Creates the invited staff member and signs them in, like sign-up does for an owner.
+export async function acceptInvitation(request, response) {
+  const { user, business, sessionToken } = await acceptStaffInvitation(request.validatedBody)
+  setSessionCookie(response, sessionToken)
+  response.status(201).json({ user, business })
 }
 
 export function getCurrentUser(request, response) {

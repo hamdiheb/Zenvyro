@@ -32,6 +32,12 @@ export async function findLiveSessionByTokenHash(databaseExecutor, tokenHash) {
   return result.rows[0] ?? null
 }
 
+// Ends every session of one user, for example after their role changed.
+export async function deleteSessionsForUser(databaseExecutor, userId) {
+  const result = await databaseExecutor.query(`DELETE FROM sessions WHERE user_id = $1`, [userId])
+  return result.rowCount
+}
+
 export async function deleteSessionByTokenHash(databaseExecutor, tokenHash) {
   const result = await databaseExecutor.query(
     `DELETE FROM sessions WHERE token_hash = $1`,

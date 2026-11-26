@@ -203,3 +203,20 @@ CREATE TABLE widget_sessions (
   CHECK (expires_at > created_at)
 );
 CREATE INDEX widget_sessions_expires_at_idx ON widget_sessions (expires_at);
+
+-- Staff invitations (see db/migrations/002_user_invitations.sql).
+CREATE TABLE user_invitations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id uuid NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  email text NOT NULL,
+  role text NOT NULL CHECK (role IN ('admin', 'agent')),
+  token_hash text NOT NULL UNIQUE CHECK (token_hash ~ '^[0-9a-f]{64}$'),
+  invited_by_user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  accepted_at timestamptz,
+  CHECK (expires_at > created_at)
+);
+CREATE UNIQUE INDEX user_invitations_open_email_idx
+  ON user_invitations (business_id, email)
+  WHERE accepted_at IS NULL;

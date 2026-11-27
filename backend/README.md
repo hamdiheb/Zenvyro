@@ -8,7 +8,7 @@ Express 5 API for the support platform. Raw SQL on PostgreSQL through `pg`, no O
 2. Start Postgres from `saas/`: `docker compose up -d postgres`. Wait until `docker compose ps` shows the container as `healthy`.
    - The compose file publishes Postgres on host port 5433 (container port 5432). Make sure nothing else uses 5433.
    - The `saad_test` database is created only when the data volume is first created. If it is missing, run `docker compose down -v` and then `docker compose up -d postgres` again. That deletes the volume's data.
-3. Run tests from `backend/`: `npm test`. Tests run against `TEST_DATABASE_URL` (the `saad_test` database). The test setup applies `db/schema.sql` itself if the tables are missing.
+3. Run tests from `backend/`: `npm test`. Tests run against `TEST_DATABASE_URL` (the `saad_test` database). The test setup applies `db/migrations/*.sql` itself, the same way `db/migrate.sh` does: in filename order, each in a transaction, recorded in `schema_migrations`. A test database built earlier from `db/schema.sql` is treated as already having `001_initial_schema.sql`.
 
 `src/config/loadProjectEnvironmentFile.js` loads `saas/.env` whatever folder the command runs from. Values already set in the environment (for example by docker compose) take priority over the file.
 
@@ -24,8 +24,9 @@ Base path: `/api/authentication`. Sessions are opaque random tokens. No JWT is u
 | POST | `/sign-in` | no | 200 `{ user, business }` | Starts a new session and sets the cookie. Wrong password and unknown email both return the same 401. |
 | GET | `/me` | yes | 200 `{ user, business }` | Returns the signed-in user and their business (`id`, `name`, `slug`). |
 | POST | `/sign-out` | yes | 204 | Deletes the session row and clears the cookie. |
+| POST | `/accept-invitation` | no | 201 `{ user, business }` | Body `{ token, name, password }`. Creates the invited staff member with the invited role in the inviting business, starts a session, sets the cookie. See [Staff management](#staff-management-roles-and-invitations). |
 
-Errors are JSON: `{ "error": "message" }`. Expected failures return 400 (validation), 401 (not signed in or wrong credentials) or 409 (email already registered).
+Errors are JSON: `{ "error": "message" }`. Expected failures return 400 (validation), 401 (not signed in or wrong credentials), 403 (signed in, but the role does not allow it), 404 (not found, or belongs to another business) or 409 (conflict, for example email already registered).
 
 ### Session design
 
@@ -134,6 +135,36 @@ Every conversation object also includes `lastMessage: { preview, senderType, cre
 - `routes/labelsRoutes.js`, `controllers/labelsController.js`, `services/labelsService.js`, `repositories/labelsRepository.js`
 - `middleware/validateCreateLabelMiddleware.js`, `validateSetConversationLabelsMiddleware.js`
 - `utils/labelValues.js`
+
+## Staff management: roles and invitations
+
+Roles are `owner` (one per business, created at sign-up), `admin` and `agent`. Owners and admins manage staff and anything that changes what the AI tells customers; agents work the inbox. Each staff member belongs to exactly one business, and `users.email` is globally unique.
+
+| Method | Path | Roles | Success | Notes |
+|---|---|---|---|---|
+| GET | `/api/users` | any | 200 `{ users }` | Agent picker (see above). |
+| POST | `/api/users/invitations` | owner, admin | 201 `{ invitation, invitationLink? }` | Body `{ email, role }`, role `admin` or `agent`. 409 when the email is already staff here, or belongs to another business. Re-inviting an email replaces its open invitation. |
+| PATCH | `/api/users/:userId` | owner, admin | 200 `{ user }` | Body `{ role }`, `admin` or `agent`. Ends all the user's sessions when the role changes. 403 for the owner or yourself. |
+| DELETE | `/api/users/:userId` | owner, admin | 204 | Deletes the user and their sessions; their conversations become unassigned. 403 for the owner or yourself. |
+| PATCH | `/api/conversations/:conversationId` with `mode: "ai"` | owner, admin | 200 `{ conversation }` | Handing back to AI is admin-only until a per-business setting exists (Q8). Any staff member may set `mode: "human"` (take over). |
+
+A wrong role gets 403 `You do not have permission to do this.` An id from another business gets 404, the same as an unknown id.
+
+### Invitations
+
+- **Token:** 32 random bytes, base64url, valid 7 days. Only its SHA-256 hash is stored (`user_invitations.token_hash`).
+- **Link:** `{STAFF_APP_BASE_URL}/accept-invitation#token=...`. The token is in the URL fragment, so browsers never send it to a server or in a `Referer` header. `STAFF_APP_BASE_URL` defaults to the first `CORS_ALLOWED_ORIGINS` entry.
+- **Delivery:** no mail provider is chosen yet. `services/invitationMailService.js` is the mail port; its default adapter sends nothing and the API returns `invitationLink` to the inviter. A real adapter (`setInvitationMailer`) returns `isLinkReturnedToInviter: false`, and the link then stays out of the response.
+- **Accepting** is single-use: one `UPDATE ... WHERE accepted_at IS NULL AND expires_at > now()` claims the invitation inside the same transaction that creates the user, so two simultaneous accepts cannot both succeed. Unknown, used and expired tokens all get the same 400.
+
+Live Socket.IO connections of a removed or re-roled user are not cut yet (#50). Their REST requests fail at once.
+
+### Layout
+
+- `middleware/requireRoleMiddleware.js`: `requireRoleMiddleware(allowedRoles)`, placed after `requireSessionMiddleware`. Use it with `STAFF_MANAGER_ROLES` from `utils/userRoles.js` on every new configuration, rules, knowledge or widget-settings write route.
+- `middleware/requireRoleToHandBackToAiMiddleware.js`, `validateCreateInvitationMiddleware.js`, `validateAcceptInvitationMiddleware.js`, `validateUserIdMiddleware.js`, `validateUpdateUserRoleMiddleware.js`
+- `services/usersService.js`, `services/invitationMailService.js`, `repositories/userInvitationsRepository.js`
+- `db/migrations/002_user_invitations.sql` (also in `db/schema.sql`)
 
 ## Visitor origin (geo detection)
 

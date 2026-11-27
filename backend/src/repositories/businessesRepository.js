@@ -9,6 +9,14 @@ export async function insertBusiness(databaseExecutor, { name, slug, widgetKey }
   return result.rows[0]
 }
 
+export async function findBusinessById(databaseExecutor, businessId) {
+  const result = await databaseExecutor.query(
+    `SELECT id, name, slug FROM businesses WHERE id = $1`,
+    [businessId],
+  )
+  return result.rows[0] ?? null
+}
+
 // Looks up the business that owns a widget key. The widget key is public (it is in the embed code).
 export async function findBusinessByWidgetKey(databaseExecutor, { widgetKey }) {
   const result = await databaseExecutor.query(
